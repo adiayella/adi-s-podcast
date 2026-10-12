@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { normalize } from "@/nlp/verify";
 import { durationsCompatible } from "@/services/episode-dedupe";
@@ -180,6 +180,11 @@ export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, 
           set: { title: v.title, description: v.description, paidPromotion: v.paid },
         })
         .returning({ id: episodeSources.id });
+      // The video is the best link when the feed gave none or only a dead one (replaced by a Spotify search).
+      await db
+        .update(episodes)
+        .set({ url: `https://www.youtube.com/watch?v=${v.id}` })
+        .where(and(eq(episodes.id, best.c.id), sql`(${episodes.url} is null or ${episodes.url} like 'https://open.spotify.com/search/%')`));
       // The counts were already in this response, so recording them costs no extra quota. One row per video per day.
       if (v.views !== null) {
         await db

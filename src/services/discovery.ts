@@ -11,6 +11,7 @@ import { dedupeKey } from "@/services/ingest";
 import { lastRealRun } from "@/services/job-log";
 import { getActiveConfig } from "@/services/research-settings";
 import { titleSimilarity } from "@/services/youtube";
+import { listenUrl } from "@/lib/episode-link";
 
 const { discoveryCandidates: cand, discoveryEpisodes: dep, discoveryAnalyses: dan, discoveryCandidateSnapshots: snaps, podcasts } = schema;
 
@@ -132,7 +133,7 @@ export async function discoverCore(d: Detail, opts: { force?: boolean } = {}): P
       for (let i = 0; i < feed.episodes.length; i += 50) {
         await db
           .insert(dep)
-          .values(feed.episodes.slice(i, i + 50).map((e) => ({ candidateId: row.id, title: e.title, description: e.description ?? null, publishedAt: e.publishedAt, url: e.url ?? null, dedupeKey: e.dedupeKey })))
+          .values(feed.episodes.slice(i, i + 50).map((e) => ({ candidateId: row.id, title: e.title, description: e.description ?? null, publishedAt: e.publishedAt, url: listenUrl(e.url, e.title), dedupeKey: e.dedupeKey })))
           .onConflictDoNothing();
       }
       bump(d, "candidatesKept");

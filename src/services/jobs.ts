@@ -16,6 +16,8 @@ import { lastRealRun, tracked } from "@/services/job-log";
 import { getActiveConfig } from "@/services/research-settings";
 import { resolveAll } from "@/services/resolve";
 import { saveSnapshots } from "@/services/snapshots";
+import { repairEpisodeLinks } from "@/services/spotify-links";
+import { runSpotifyTrends } from "@/services/spotify-trends";
 import { syncYoutube } from "@/services/youtube";
 import { fetchPendingTranscripts } from "@/transcripts/fetch";
 
@@ -86,6 +88,7 @@ export function runFocused(opts: { force?: boolean; budgetMs?: number } = {}) {
         d[name] = { error: e instanceof Error ? e.message.slice(0, 160) : String(e) };
       }
     };
+    await optional("spotifyLinks", () => repairEpisodeLinks());
     await optional("semantic", async () => ({ ...(await embedMissingEpisodes()), ...(await buildClusters()) }));
     await optional("opportunities", () => scoreOpportunities());
     await optional("audience", async () => ({ ...(await runAudienceAnalysis({ maxVideos: 4 })), ...(await buildAudienceThemes()) }));
@@ -113,7 +116,16 @@ export async function retryBrief() {
 
 /** Discovery Research: look for new podcasts and opportunities outside the watchlist. Never changes the watchlist itself. */
 export function runDiscovery(opts: { force?: boolean } = {}) {
-  return tracked("discovery", (d) => discoverCore(d, opts));
+  return tracked("discovery", async (d) => {
+    const started = Date.now();
+    await discoverCore(d, opts);
+    // Spotify trend scan by sector. Optional: a failure is recorded and never blocks discovery.
+    try {
+      d.spotifyTrends = await runSpotifyTrends({ force: opts.force, budgetMs: Math.max(0, BUDGET_MS - (Date.now() - started)) });
+    } catch (e) {
+      d.spotifyTrends = { error: e instanceof Error ? e.message.slice(0, 160) : String(e) };
+    }
+  });
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

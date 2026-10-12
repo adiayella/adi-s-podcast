@@ -1,15 +1,17 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { Hash, Layers } from "lucide-react";
+import { Hash, Layers, Radio } from "lucide-react";
 import { Badge, EmptyState, PageHeader, Panel, PanelSkeleton } from "@/components/ui";
 import { formatDateTimeIST } from "@/lib/format";
+import { SpotifyTrends } from "@/components/spotify-trends";
 import { getSectorTrends } from "@/services/intelligence";
+import { getSpotifyTrends } from "@/services/spotify-trends";
 import { listClusters } from "@/services/semantic";
 
 export default function SectorsPage() {
   return (
     <>
-      <PageHeader title="Sector Intelligence" subtitle="Which topics are gaining momentum, how their episodes perform on YouTube, and what themes cut across shows." />
+      <PageHeader title="Sector Intelligence" subtitle="Which topics are gaining momentum, how their episodes perform on YouTube and Spotify, and what themes cut across shows." />
       <Suspense fallback={<PanelSkeleton className="h-96" />}>
         <Body />
       </Suspense>
@@ -21,7 +23,7 @@ const tone = (l: string) => (l === "high" ? "good" : l === "medium" ? "warn" : "
 
 async function Body() {
   await connection();
-  const [sectors, clusters] = await Promise.all([getSectorTrends(), listClusters()]);
+  const [sectors, clusters, spotify] = await Promise.all([getSectorTrends(), listClusters(), getSpotifyTrends()]);
   const rows = sectors.filter((s) => s.episodesThisWeek + s.episodesPrevWeek > 0).sort((a, b) => Number(b.focus) - Number(a.focus) || b.episodesThisWeek - a.episodesThisWeek);
   return (
     <div className="grid gap-5">
@@ -68,6 +70,16 @@ async function Body() {
         <p className="mt-4 text-sm text-muted">
           <strong className="text-ink/90">Engagement vs show norm</strong> compares each episode’s views per day with other episodes of the same show at a similar age, so a small channel is not penalised for being small. 1.0× is typical. Episodes under 7 days old are not scored because early views are front-loaded. Share counts are not available from YouTube. Counts are public YouTube statistics.
         </p>
+      </Panel>
+
+      <Panel title="Spotify trend by sector" icon={Radio} right={spotify[0] && <span className="text-sm text-muted">checked {spotify[0].observedOn} · data and artwork from Spotify</span>}>
+        {spotify.length ? (
+          <SpotifyTrends sectors={spotify} />
+        ) : (
+          <EmptyState icon={Radio} title="No Spotify scan yet">
+            <p>The daily discovery job scans Spotify once SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are set.</p>
+          </EmptyState>
+        )}
       </Panel>
 
       <Panel title="Themes found by meaning" icon={Layers} right={clusters[0] && <span className="text-sm text-muted">rebuilt {formatDateTimeIST(clusters[0].computedAt)} IST</span>}>

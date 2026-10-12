@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { descriptionKey, durationToSeconds, isReupload, type KnownEpisode } from "@/services/episode-dedupe";
 import { permissionFor } from "@/transcripts/policy";
 import { pickTranscriptLink, type TranscriptLink } from "@/transcripts/parse";
+import { listenUrl } from "@/lib/episode-link";
 
 const { podcasts, episodes, episodeSources, episodeTranscripts } = schema;
 
@@ -118,7 +119,7 @@ export async function ingestPodcast(
     result.duplicatesSkipped = duplicatesSkipped;
 
     if (rows.size) {
-      const values = [...rows.values()].map((r) => ({ podcastId: r.podcastId, title: r.title, description: r.description, publishedAt: r.publishedAt, url: r.url, dedupeKey: r.dedupeKey, durationSeconds: r.durationSeconds ?? null }));
+      const values = [...rows.values()].map((r) => ({ podcastId: r.podcastId, title: r.title, description: r.description, publishedAt: r.publishedAt, url: listenUrl(r.url, r.title), dedupeKey: r.dedupeKey, durationSeconds: r.durationSeconds ?? null }));
       const inserted = await db
         .insert(episodes)
         .values(values)

@@ -402,6 +402,33 @@ export const apiUsage = pgTable(
   (t) => [uniqueIndex("api_usage_day_provider_uq").on(t.day, t.provider)],
 );
 
+// One row per (sector, show, day): what Spotify's search returned for a sector and how the show scored on the
+// Spotify trend rubric. Only links, counts and up to 3 sample episode titles are kept, and rows older than
+// 30 days are deleted on every run (Spotify Developer Terms: no indefinite storage of Spotify Content).
+export const spotifySectorObservations = pgTable(
+  "spotify_sector_observations",
+  {
+    id: serial("id").primaryKey(),
+    sector: text("sector").notNull(),
+    observedOn: date("observed_on").notNull(),
+    rank: integer("rank").notNull(),
+    spotifyShowId: text("spotify_show_id").notNull(),
+    name: text("name").notNull(),
+    imageUrl: text("image_url"),
+    spotifyUrl: text("spotify_url").notNull(),
+    totalEpisodes: integer("total_episodes").notNull(),
+    languages: jsonb("languages").notNull(),
+    score: real("score").notNull(),
+    label: text("label").notNull(), // hot | rising | steady | quiet
+    components: jsonb("components").notNull(),
+    metrics: jsonb("metrics").notNull(),
+    sampleEpisodes: jsonb("sample_episodes").notNull(),
+    rubricVersion: text("rubric_version").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("spotify_obs_uq").on(t.sector, t.spotifyShowId, t.observedOn), index("spotify_obs_day_idx").on(t.observedOn)],
+);
+
 // =====================================================================================
 // Transcript enrichment: where each episode's transcript came from, what it says, and when.
 // One row per (episode, source). Text is kept for re-analysis; the UI only ever shows short quotes.
