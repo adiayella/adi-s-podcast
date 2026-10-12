@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Check, Database, Mail, Sparkles, Video, X, Rss } from "lucide-react";
+import { Check, Database, Globe, Mail, Radio, Sparkles, Video, X, Rss } from "lucide-react";
 import { Badge, Panel, PanelSkeleton, PageHeader } from "@/components/ui";
 import { formatDateTimeIST, timeAgo } from "@/lib/format";
 import { getCoverage, getTranscriptStatus } from "@/lib/queries";
@@ -11,12 +11,15 @@ import { recentRuns } from "@/services/jobs";
 async function Sources() {
   await connection();
   const set = (k: string) => Boolean(process.env[k]);
+  const recipient = await getRecipient();
   const items = [
     { icon: Rss, name: "Podcast RSS feeds", detail: "Public feeds. No key required.", ok: true },
     { icon: Video, name: "YouTube Data API v3", detail: "Second episode source", ok: set("YOUTUBE_API_KEY") },
     { icon: Sparkles, name: "Gemini Flash", detail: `Model: ${process.env.GEMINI_MODEL ?? "gemini-3.5-flash"}`, ok: set("GEMINI_API_KEY") },
     { icon: Database, name: "Neon PostgreSQL", detail: "Episodes, entities, scores, reports", ok: set("DATABASE_URL") },
-    { icon: Mail, name: "Resend email", detail: "Monday brief delivery", ok: set("RESEND_API_KEY") && set("BRIEF_TO_EMAIL") },
+    { icon: Mail, name: "Resend email", detail: "Monday brief delivery", ok: set("RESEND_API_KEY") && Boolean(recipient) },
+    { icon: Radio, name: "Spotify Web API", detail: "Exact episode links and the sector trend scan", ok: set("SPOTIFY_CLIENT_ID") && set("SPOTIFY_CLIENT_SECRET") },
+    { icon: Globe, name: "Tavily web search", detail: "Live web context on the search page", ok: set("TAVILY_API_KEY") },
     { icon: Check, name: "Scheduled job secret", detail: "Protects the /api/cron endpoints", ok: set("CRON_SECRET") },
   ];
   return (

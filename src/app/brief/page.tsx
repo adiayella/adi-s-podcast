@@ -40,7 +40,7 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/brief">["se
         {admin && <BriefActions />}
         {admin && <BriefDeliveryForm recipient={delivery.recipient ?? ""} hourIST={delivery.hourIST} source={delivery.recipientSource} />}
         <EmptyState icon={Mail} title="No brief has been generated yet">
-          <p>The first brief is created by the Monday job, or by an admin with “Generate now”. If the evidence is too thin to support a recommendation, the brief says so instead of inventing insights.</p>
+          <p>The first brief is created by the Monday job, or with “Generate now”. If the evidence is too thin to support a recommendation, the brief says so instead of inventing insights.</p>
         </EmptyState>
       </div>
     );

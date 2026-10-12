@@ -1,6 +1,7 @@
 import "./env";
 import { neon } from "@neondatabase/serverless";
 import { GoogleGenAI } from "@google/genai";
+import { getDeliverySettings } from "../src/services/brief";
 
 // usage: npm run healthcheck [-- --base http://localhost:3000]
 // Read-only: checks data integrity, integrations and (if a server is running) every page. Sends no email.
@@ -148,14 +149,21 @@ async function main() {
     const body = (await r.json().catch(() => ({}))) as { name?: string };
     return [r.ok || body.name === "restricted_api_key", `HTTP ${r.status}${body.name ? ` ${body.name}` : ""}`];
   });
-  for (const k of ["DATABASE_URL", "YOUTUBE_API_KEY", "GEMINI_API_KEY", "RESEND_API_KEY", "BRIEF_TO_EMAIL", "CRON_SECRET", "ADMIN_PASSWORD"])
+  for (const k of ["DATABASE_URL", "YOUTUBE_API_KEY", "GEMINI_API_KEY", "RESEND_API_KEY", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "TAVILY_API_KEY"])
     check(`Env: ${k} set`, Boolean(process.env[k]));
+  // CRON_SECRET is what Vercel Cron presents; it is required on the deployed app, optional locally (jobs run as scripts).
+  const local = /localhost|127\.0\.0\.1/.test(base);
+  check("Env: CRON_SECRET set" + (local ? " (optional locally)" : ""), local || Boolean(process.env.CRON_SECRET), process.env.CRON_SECRET ? "set" : "not set");
+  await run("Brief: a recipient is configured (database setting, or BRIEF_TO_EMAIL)", async () => {
+    const d = await getDeliverySettings();
+    return [Boolean(d.recipient), `from ${d.recipientSource}`];
+  });
 
   // ---------------- running app
   const up = await fetch(base).then((r) => r.ok).catch(() => false);
   check("App: server reachable", up, base);
   if (up) {
-    const pages: [string, string][] = [["/", "Overview"], ["/guests", "Guest Radar"], ["/topics", "Topic Radar"], ["/sponsors", "Sponsor Radar"], ["/brief", "Weekly Intelligence Brief"], ["/research", "Research Control Center"], ["/research?tab=discovery", "Discovery status"], ["/settings", "Data Sources"], ["/admin", "Admin"]];
+    const pages: [string, string][] = [["/", "Overview"], ["/guests", "Guest Radar"], ["/topics", "Topic Radar"], ["/sponsors", "Sponsor Radar"], ["/brief", "Weekly Intelligence Brief"], ["/research", "Research Control Center"], ["/research?tab=discovery", "Discovery status"], ["/settings", "Data Sources"], ["/sectors", "Spotify trend by sector"], ["/outreach", "Outreach"]];
     for (const [path, text] of pages) {
       await run(`Page ${path}`, async () => {
         const r = await fetch(base + path);
@@ -163,11 +171,16 @@ async function main() {
         return [r.ok && html.includes(text) && !/Application error|Internal Server Error/i.test(html), `HTTP ${r.status}`];
       });
     }
-    await run("Cron: no token -> 401", async () => [(await fetch(`${base}/api/cron/focused`)).status === 401]);
-    await run("Cron: wrong token -> 401", async () => [(await fetch(`${base}/api/cron/weekly`, { headers: { Authorization: "Bearer wrong" } })).status === 401]);
-    await run("Admin: the public Research page is read-only (no add-podcast or save controls)", async () => {
+    const refused = (st: number) => st === 401 || (!process.env.CRON_SECRET && st === 503); // 503 = no secret configured, so nothing runs
+    await run("Cron: no token is refused", async () => { const st = (await fetch(`${base}/api/cron/focused`)).status; return [refused(st), `HTTP ${st}`]; });
+    await run("Cron: a wrong token is refused", async () => { const st = (await fetch(`${base}/api/cron/weekly`, { headers: { Authorization: "Bearer wrong" } })).status; return [refused(st), `HTTP ${st}`]; });
+    await run("Access: every visitor gets the edit controls (no admin login exists)", async () => {
       const html = await (await fetch(`${base}/research?tab=focused`)).text();
-      return [!html.includes("Add a podcast") && html.includes("Read-only view") && html.includes("Sign in as admin"), "read-only for visitors"];
+      return [html.includes("Add a podcast") && !html.includes("Sign in as admin"), "public by the founder's decision"];
+    });
+    await run("Access: the old /admin address redirects to the Overview", async () => {
+      const r = await fetch(`${base}/admin`, { redirect: "manual" });
+      return [r.status >= 300 && r.status < 400, `HTTP ${r.status}`];
     });
     await run("Admin: the old /podcasts address redirects to the Research Center", async () => {
       const r = await fetch(`${base}/podcasts`, { redirect: "manual" });
@@ -176,7 +189,7 @@ async function main() {
     await run("Cron: the new focused and discovery endpoints reject missing tokens", async () => {
       const a = await fetch(`${base}/api/cron/focused`);
       const b = await fetch(`${base}/api/cron/discovery`);
-      return [a.status === 401 && b.status === 401, `${a.status}/${b.status}`];
+      return [refused(a.status) && refused(b.status), `${a.status}/${b.status}`];
     });
   }
 

@@ -10,7 +10,6 @@ import {
   MessageCircleQuestion,
   Scale,
   Send,
-  Lock,
   LayoutDashboard,
   Megaphone,
   Radio,
@@ -34,7 +33,6 @@ const MANAGE: typeof NAV = [
   { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/rubrics", label: "Scoring Rubrics", icon: Scale },
   { href: "/settings", label: "Data Sources", icon: Settings },
-  { href: "/admin", label: "Admin", icon: Lock },
 ];
 
 function NavLink({ href, label, icon: Icon }: (typeof NAV)[number]) {
