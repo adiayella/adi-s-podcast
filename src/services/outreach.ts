@@ -135,20 +135,13 @@ export type Target = { kind: Kind; id: number; name: string; company: string | n
 /** Who is worth contacting: the top-scored guests, and only sponsors with a verified disclosure, with their contacts and live draft. */
 export async function listTargets(opts: { guests?: number; sponsors?: number } = {}): Promise<Target[]> {
   const [g, s] = await Promise.all([latestOpportunities("guest", opts.guests ?? 8), latestOpportunities("sponsor", 12)]);
-  const out: Target[] = [];
-  for (const o of g) out.push(await toTarget("guest", o));
-  let sp = 0;
-  for (const o of s) {
-    if (sp >= (opts.sponsors ?? 4)) break;
-    const t = await toTarget("brand", o);
-    if (t.blocked) continue; // promo-link-only brands are not outreach targets
-    out.push(t);
-    sp++;
-  }
-  return out;
+  // Each target needs a few small queries; running them side by side keeps the page fast (they were sequential).
+  const [guests, brands] = await Promise.all([Promise.all(g.map((o) => toTarget("guest", o))), Promise.all(s.map((o) => toTarget("brand", o)))]);
+  // promo-link-only brands are not outreach targets
+  return [...guests, ...brands.filter((t) => !t.blocked).slice(0, opts.sponsors ?? 4)];
 }
 async function toTarget(kind: Kind, o: Awaited<ReturnType<typeof latestOpportunities>>[number]): Promise<Target> {
-  const ev = kind === "brand" ? await buildEvidence("brand", o.entity_id) : null;
+  const [ev, contacts, draft] = await Promise.all([kind === "brand" ? buildEvidence("brand", o.entity_id) : null, listContacts(kind, o.entity_id), getLiveDraft(kind, o.entity_id)]);
   return {
     kind,
     id: o.entity_id,
@@ -157,8 +150,8 @@ async function toTarget(kind: Kind, o: Awaited<ReturnType<typeof latestOpportuni
     score: Number(o.score),
     level: o.confidence.level,
     reasons: o.criteria.filter((c) => c.value !== null && c.value >= 0.5).slice(0, 3).map((c) => `${c.label}: ${c.note}`),
-    contacts: await listContacts(kind, o.entity_id),
-    draft: await getLiveDraft(kind, o.entity_id),
+    contacts,
+    draft,
     blocked: ev && "error" in ev ? ev.error : null,
   };
 }
