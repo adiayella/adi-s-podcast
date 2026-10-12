@@ -238,6 +238,19 @@ export const weeklyReports = pgTable("weekly_reports", {
   emailStatus: text("email_status").notNull().default("pending"), // pending | sent | failed
   emailedAt: timestamp("emailed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Three separate statuses: writing the brief, handing it to the email provider, and what the provider reports afterwards.
+  generationStatus: text("generation_status").notNull().default("ready"), // generating | ready | failed
+  generationError: text("generation_error"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }),
+  sendStatus: text("send_status").notNull().default("not_sent"), // not_sent | sending | accepted | failed
+  sendError: text("send_error"),
+  sendAttempts: integer("send_attempts").notNull().default(0),
+  sendStartedAt: timestamp("send_started_at", { withTimezone: true }), // when the current send claimed the row; a claim older than 10 minutes is treated as a crashed send
+  recipient: text("recipient"),
+  providerEmailId: text("provider_email_id"),
+  deliveryStatus: text("delivery_status").notNull().default("unknown"), // unknown | delivered | delayed | bounced | complained | failed
+  deliveryEvent: text("delivery_event"), // the provider's raw last_event
+  deliveryCheckedAt: timestamp("delivery_checked_at", { withTimezone: true }),
 });
 
 export const jobRuns = pgTable("job_runs", {

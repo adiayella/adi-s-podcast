@@ -1,0 +1,1 @@
+ALTER TABLE "weekly_reports" ADD COLUMN "send_started_at" timestamp with time zone;

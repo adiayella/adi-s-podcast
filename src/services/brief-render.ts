@@ -4,6 +4,13 @@ import type { Narrative } from "./brief-narrative";
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 const dateIST = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+/** "5 Oct to 11 Oct 2026" from the instant the reported week began (Monday 00:00 IST). */
+const periodShort = (fromIso: string) => {
+  const from = new Date(fromIso);
+  const to = new Date(from.getTime() + 6 * 86_400_000);
+  const f = (d: Date, y: boolean) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", ...(y ? { year: "numeric" } : {}), timeZone: "Asia/Kolkata" });
+  return `${f(from, false)} to ${f(to, true)}`;
+};
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 type Block = { kind: "p"; text: string; muted?: boolean } | { kind: "item"; title: string; meta: string; body?: string[]; links?: { label: string; url: string }[] };
@@ -28,6 +35,12 @@ export function buildBriefDoc(stats: BriefStats, narrative: Narrative | null): B
     : undefined;
 
   const intro: Block[] = [];
+  const a = stats.activity;
+  if (stats.period && a) {
+    const delta = (cur: number, prev: number) => (prev === 0 ? (cur === 0 ? "no change" : "up from 0") : `${cur >= prev ? "+" : ""}${Math.round(((cur - prev) / prev) * 100)}%`);
+    intro.push({ kind: "p", muted: true, text: `Reporting period: ${stats.period.label} (Monday to Sunday, IST), compared with ${stats.period.previousLabel}. Monitored shows published ${plural(a.episodes, "episode")} across ${plural(a.shows, "show")} (${delta(a.episodes, a.previousEpisodes)} vs ${a.previousEpisodes}); ${plural(a.newGuests, "guest")} first appeared on the radar (${a.previousNewGuests} the week before).` });
+  }
+  for (const note of stats.dataNotes ?? []) intro.push({ kind: "p", muted: true, text: `Data note: ${note}` });
   if (narrative?.summary) intro.push({ kind: "p", text: narrative.summary });
   else if (!narrative) intro.push({ kind: "p", text: "AI commentary was unavailable this week. Everything below is computed directly from the data.", muted: true });
   if (stats.coverage && stats.coverage.total > 0)
@@ -146,8 +159,8 @@ export function buildBriefDoc(stats: BriefStats, narrative: Narrative | null): B
     : [{ kind: "p", muted: true, text: "No AI-written actions this week. Use the ranked lists above: contact the top guests, plan around the top topics, and verify the sponsor leads before pitching." }];
 
   return {
-    subject: `Monday brief: week of ${week}`,
-    title: `Monday Intelligence Brief · week of ${week}`,
+    subject: stats.period ? `Monday brief: ${periodShort(stats.period.from)}` : `Monday brief: week of ${week}`,
+    title: stats.period ? `Monday Intelligence Brief · ${periodShort(stats.period.from)}` : `Monday Intelligence Brief · week of ${week}`,
     sections: [
       ...(intro.length ? [{ heading: "This week", blocks: intro }] : []),
       { group: focusGroup, groupNote: focusNote, heading: "Guest opportunities", blocks: guestBlocks },

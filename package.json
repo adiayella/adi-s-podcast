@@ -24,6 +24,7 @@
     "resolve": "tsx scripts/resolve.ts",
     "snapshot": "tsx scripts/snapshot.ts",
     "brief": "tsx scripts/brief.ts",
+    "weekly-e2e": "tsx scripts/weekly-e2e.ts",
     "healthcheck": "tsx scripts/healthcheck.ts",
     "discovery": "tsx scripts/discovery.ts",
     "focused": "tsx scripts/focused.ts",

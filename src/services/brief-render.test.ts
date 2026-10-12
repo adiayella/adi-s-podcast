@@ -88,3 +88,28 @@ describe("email safety", () => {
     expect(html).not.toContain("javascript:");
   });
 });
+
+describe("reporting period", () => {
+  const withPeriod: BriefStats = {
+    ...base,
+    weekStart: "2026-10-05",
+    period: { label: "2026-10-05 to 2026-10-11", from: "2026-10-04T18:30:00.000Z", to: "2026-10-11T18:30:00.000Z", previousLabel: "2026-09-28 to 2026-10-04" },
+    activity: { episodes: 18, previousEpisodes: 17, shows: 9, previousShows: 8, newGuests: 5, previousNewGuests: 0 },
+  };
+  it("names the completed week in the subject and compares it with the week before", () => {
+    const doc = buildBriefDoc(withPeriod, null);
+    expect(doc.subject).toBe("Monday brief: 5 Oct to 11 Oct 2026");
+    const md = toMarkdown(doc);
+    expect(md).toContain("Reporting period: 2026-10-05 to 2026-10-11");
+    expect(md).toContain("compared with 2026-09-28 to 2026-10-04");
+    expect(md).toContain("+6% vs 17");
+  });
+  it("states plainly when the data behind the brief was not fully fresh", () => {
+    const md = toMarkdown(buildBriefDoc({ ...withPeriod, dataNotes: ["3 episode(s) are still waiting for analysis."] }, null));
+    expect(md).toContain("Data note: 3 episode(s) are still waiting for analysis.");
+  });
+  it("does not divide by zero when the earlier week was empty", () => {
+    const md = toMarkdown(buildBriefDoc({ ...withPeriod, activity: { ...withPeriod.activity!, previousEpisodes: 0 } }, null));
+    expect(md).toContain("up from 0");
+  });
+});

@@ -4,6 +4,7 @@ import { candidateCounts, discoverySponsors, emergingThemes, foundersAcrossShows
 import { getCoverage } from "@/lib/queries";
 import { getFocusContext } from "@/services/focus-context";
 import { lastRealRun } from "@/services/job-log";
+import { addDays, weekLabel, weekRange } from "@/lib/weeks";
 import { getGuestRadar, getSponsorRadar, getTopicRadar, parsePeriod } from "@/services/radars";
 
 // Everything in the brief that is a fact comes from here: SQL counts and the same scoring code the
@@ -41,6 +42,10 @@ export type BriefStats = {
   unexpected?: { name: string; shows: number; episodesThisWeek: number; episodesPrevWeek: number; trend: string; sampleEpisodes: Ep[] }[];
   discovery?: DiscoveryStats;
   weekStart: string;
+  // the reported Monday-to-Sunday IST week and the one before it, with real counts for both
+  period?: { label: string; from: string; to: string; previousLabel: string };
+  dataNotes?: string[]; // set when the brief had to be written from data that was not fully fresh or analysed
+  activity?: { episodes: number; previousEpisodes: number; shows: number; previousShows: number; newGuests: number; previousNewGuests: number };
   generatedAt: string;
   guests: {
     id: number;
@@ -99,7 +104,12 @@ async function rows<T>(q: ReturnType<typeof sql>): Promise<T[]> {
 
 const trim = (e: { title: string; url: string | null; podcast: string; at: string }): Ep => ({ title: e.title, url: e.url, podcast: e.podcast, at: e.at });
 
-export async function buildBriefStats(weekStart: string, now = new Date()): Promise<BriefStats> {
+export async function buildBriefStats(weekStart: string, generatedAt = new Date()): Promise<BriefStats> {
+  // Everything is measured as of the END of the reported week, so a brief regenerated later still describes that week.
+  const range = weekRange(weekStart);
+  const prevRange = weekRange(addDays(weekStart, -7));
+  const now = new Date(Math.min(range.to.getTime(), generatedAt.getTime()));
+  const ts = (d: Date) => sql`${d.toISOString()}::timestamptz`;
   const fx = await getFocusContext(); // the founder's preferences applied to the monitored shows
   const guestWindowDays = Math.min(30, fx.config.dateRangeDays);
   const sponsorWindowDays = Math.min(365, fx.config.dateRangeDays);
@@ -110,7 +120,7 @@ export async function buildBriefStats(weekStart: string, now = new Date()): Prom
     .sort((a, b) => Number(b.focus) - Number(a.focus) || b.distinctPodcasts - a.distinctPodcasts || b.score.score - a.score.score);
   const weekAgo = now.getTime() - 7 * 86_400_000;
 
-  const topicRows = await getTopicRadar({ focus: fx });
+  const topicRows = await getTopicRadar({ focus: fx, asOf: now });
   const prev = await rows<{ entityId: number; score: string }>(sql`
     select entity_id as "entityId", score from score_snapshots
     where kind = 'topic' and week_start = (select max(week_start) from score_snapshots where kind = 'topic' and week_start < ${weekStart}::date)`);
@@ -119,11 +129,23 @@ export async function buildBriefStats(weekStart: string, now = new Date()): Prom
   const sponsorRows = await getSponsorRadar({ period: parsePeriod(`${sponsorWindowDays}d`, now), focus: fx });
 
   const [health] = await rows<{ eps: number; errors: number; failed: number }>(sql`
-    select (select count(*) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= now() - interval '7 days')::int as eps,
+    select (select count(*) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= ${ts(range.from)} and e.published_at < ${ts(now)})::int as eps,
            (select count(*) from podcasts where enabled and last_sync_status = 'error')::int as errors,
            (select count(*) from analysis_jobs where status = 'failed')::int as failed`);
   const [lastRun] = await rows<{ startedAt: string; status: string }>(sql`
     select started_at as "startedAt", status from job_runs where job = 'focused' order by started_at desc limit 1`);
+
+  const [act] = await rows<{ eps: number; prevEps: number; shows: number; prevShows: number; newG: number; prevNewG: number }>(sql`
+    with first_seen as (
+      select ga.guest_id, min(e2.published_at) as at from guest_appearances ga join episodes e2 on e2.id = ga.episode_id group by 1
+    )
+    select
+      (select count(*) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= ${ts(range.from)} and e.published_at < ${ts(range.to)})::int as eps,
+      (select count(*) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= ${ts(prevRange.from)} and e.published_at < ${ts(prevRange.to)})::int as "prevEps",
+      (select count(distinct e.podcast_id) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= ${ts(range.from)} and e.published_at < ${ts(range.to)})::int as shows,
+      (select count(distinct e.podcast_id) from episodes e join podcasts p on p.id = e.podcast_id and p.enabled where e.published_at >= ${ts(prevRange.from)} and e.published_at < ${ts(prevRange.to)})::int as "prevShows",
+      (select count(*) from first_seen where at >= ${ts(range.from)} and at < ${ts(range.to)})::int as "newG",
+      (select count(*) from first_seen where at >= ${ts(prevRange.from)} and at < ${ts(prevRange.to)})::int as "prevNewG"`);
 
   const guests = candidates.slice(0, 5).map((g) => ({
     id: g.id,
@@ -207,7 +229,9 @@ export async function buildBriefStats(weekStart: string, now = new Date()): Prom
   const multi = guestRows.filter((g) => g.distinctPodcasts >= 2).length;
   return {
     weekStart,
-    generatedAt: now.toISOString(),
+    period: { label: weekLabel(weekStart), from: range.from.toISOString(), to: range.to.toISOString(), previousLabel: weekLabel(addDays(weekStart, -7)) },
+    activity: { episodes: Number(act?.eps ?? 0), previousEpisodes: Number(act?.prevEps ?? 0), shows: Number(act?.shows ?? 0), previousShows: Number(act?.prevShows ?? 0), newGuests: Number(act?.newG ?? 0), previousNewGuests: Number(act?.prevNewG ?? 0) },
+    generatedAt: generatedAt.toISOString(),
     coverage: await getCoverage(),
     focus: {
       settingsVersion: fx.version,

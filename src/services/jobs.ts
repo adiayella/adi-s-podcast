@@ -3,7 +3,9 @@ import { db, schema } from "@/db";
 import { withYoutubeBudget } from "@/lib/api-budget";
 import { effortBudget, isDue } from "@/research/config";
 import { analysisProgress, enqueueAnalysis, runAnalysisBatch } from "@/services/analyze";
-import { generateBrief, sendBrief } from "@/services/brief";
+import { reportWeekStart } from "@/lib/weeks";
+import { checkDelivery, checkPendingDeliveries, generateBrief, sendBrief } from "@/services/brief";
+import { checkReadiness } from "@/services/readiness";
 import { discoverCore } from "@/services/discovery";
 import { ingestAllEnabled } from "@/services/ingest";
 import { lastRealRun, tracked } from "@/services/job-log";
@@ -24,7 +26,7 @@ const BUDGET_MS = 240_000;
  * Focused Research: monitor the founder's podcast watchlist. Reads the research settings at run time, so a
  * changed priority list, frequency, date range or mode switch applies to the very next run. Safe to repeat.
  */
-export function runFocused(opts: { force?: boolean } = {}) {
+export function runFocused(opts: { force?: boolean; budgetMs?: number } = {}) {
   return tracked("focused", async (d) => {
     const started = Date.now();
     const { version, config } = await getActiveConfig();
@@ -62,7 +64,7 @@ export function runFocused(opts: { force?: boolean } = {}) {
 
     d.queued = await enqueueAnalysis();
     let processed = 0;
-    while (Date.now() - started < BUDGET_MS) {
+    while (Date.now() - started < (opts.budgetMs ?? BUDGET_MS)) {
       const s = await runAnalysisBatch(20, 4);
       if (s.claimed === 0) break;
       processed += s.claimed;
@@ -73,10 +75,25 @@ export function runFocused(opts: { force?: boolean } = {}) {
     d.resolved = await resolveAll();
     d.snapshot = await saveSnapshots();
 
-    // Retry a brief that failed to send earlier this week.
-    const [latest] = await db.select().from(schema.weeklyReports).orderBy(desc(schema.weeklyReports.weekStart)).limit(1);
-    if (latest?.emailStatus === "failed") d.briefRetry = await sendBrief({ reportId: latest.id });
+    d.briefRetry = await retryBrief();
   });
+}
+
+/**
+ * Housekeeping that runs every day, so a Monday brief that failed part-way is repaired within a day: regenerate if
+ * generation failed, re-send if sending failed, and re-ask the provider about any delivery that is not final yet.
+ */
+export async function retryBrief() {
+  const out: Record<string, unknown> = {};
+  const [latest] = await db.select().from(schema.weeklyReports).orderBy(desc(schema.weeklyReports.weekStart)).limit(1);
+  if (latest) {
+    if (latest.generationStatus !== "ready") {
+      out.regenerated = await generateBrief({ weekStart: latest.weekStart, force: true }).catch((e) => ({ error: String(e) }));
+    }
+    if (latest.sendStatus === "failed" || latest.sendStatus === "sending") out.resent = await sendBrief({ weekStart: latest.weekStart });
+  }
+  out.delivery = await checkPendingDeliveries();
+  return out;
 }
 
 /** Discovery Research: look for new podcasts and opportunities outside the watchlist. Never changes the watchlist itself. */
@@ -84,11 +101,51 @@ export function runDiscovery(opts: { force?: boolean } = {}) {
   return tracked("discovery", (d) => discoverCore(d, opts));
 }
 
-/** Weekly (Monday morning IST): build the brief from current data and email it. */
-export function runWeekly(opts: { force?: boolean } = {}) {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Weekly (Monday ~07:00 IST): make sure ingestion and analysis are complete, write the brief for the week that just
+ * ended, email it, then ask the provider whether it was delivered. Every step is safe to repeat, so a retry cannot
+ * produce a second email. Failures are recorded on the report and the job, never hidden.
+ */
+export function runWeekly(opts: { force?: boolean; now?: Date; deliveryWaitMs?: number } = {}) {
   return tracked("weekly", async (d) => {
-    const gen = await generateBrief({ force: opts.force });
+    const weekStart = reportWeekStart(opts.now);
+    d.weekStart = weekStart;
+
+    const [existing] = await db.select().from(schema.weeklyReports).where(eq(schema.weeklyReports.weekStart, weekStart));
+    if (existing?.sendStatus === "accepted" && !opts.force) {
+      d.skipped = "This week's brief was already sent";
+      d.delivery = await checkPendingDeliveries();
+      return;
+    }
+
+    // 1. Ingestion and analysis must be complete first. If they are not, finish them now (bounded), then re-check.
+    let ready = await checkReadiness(opts.now);
+    if (!ready.ready) {
+      d.catchUp = (await runFocused({ force: true, budgetMs: 120_000 })).ok;
+      ready = await checkReadiness(opts.now);
+    }
+    d.readiness = ready;
+
+    // 2. Generate (reuses an existing ready brief for the week).
+    const gen = await generateBrief({ force: opts.force, weekStart, now: opts.now, dataNotes: ready.ready ? [] : ready.notes });
     d.brief = gen;
-    d.email = await sendBrief({ reportId: gen.id, force: opts.force });
+
+    // 3. Send, with a few spaced retries for transient provider errors.
+    let sent: Awaited<ReturnType<typeof sendBrief>> = { sent: false, reason: "not attempted" };
+    for (const wait of [0, 4_000, 12_000]) {
+      if (wait) await sleep(wait);
+      sent = await sendBrief({ reportId: gen.id, force: opts.force });
+      if (sent.sent || sent.reason === "Already sent" || sent.reason?.includes("not configured")) break;
+    }
+    d.email = sent;
+
+    // 4. Ask the provider what happened. "accepted" is not "delivered": this records the provider's own answer.
+    if (sent.sent) {
+      await sleep(opts.deliveryWaitMs ?? 8_000);
+      d.delivery = await checkDelivery(gen.id);
+    }
+    if (!sent.sent && sent.reason !== "Already sent") throw new Error(`Brief was generated but not sent: ${sent.reason}`);
   });
 }

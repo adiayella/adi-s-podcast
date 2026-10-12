@@ -184,31 +184,32 @@ export type TopicRow = {
   unexpected: boolean; // not asked for and not excluded: a candidate for "unexpected trend"
 };
 
-export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusContext; prioritise?: boolean } = {}): Promise<TopicRow[]> {
+export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusContext; prioritise?: boolean; asOf?: Date } = {}): Promise<TopicRow[]> {
   const fx = opts.focus ?? (await getFocusContext());
+  const at = sql`${(opts.asOf ?? new Date()).toISOString()}::timestamptz`; // week-end instant: a past week reads the same as it did then
   const podcastFilter = sql`${opts.podcastId ? sql`and e.podcast_id = ${opts.podcastId}` : sql``} ${notExcluded(sql`e.id`, fx.excluded)}`;
   const base = await rows<Record<string, unknown>>(sql`
     select tp.id, tp.name,
-      count(distinct e.id) filter (where e.published_at >= now() - interval '30 days')::int as "episodes30d",
-      count(distinct e.id) filter (where e.published_at >= now() - interval '7 days')::int as "episodesThisWeek",
-      count(distinct e.id) filter (where e.published_at >= now() - interval '14 days' and e.published_at < now() - interval '7 days')::int as "episodesPrevWeek",
-      count(distinct e.id) filter (where date_trunc('month', e.published_at at time zone 'Asia/Kolkata') = date_trunc('month', now() at time zone 'Asia/Kolkata'))::int as "episodesThisMonth",
-      count(distinct e.podcast_id) filter (where e.published_at >= now() - interval '30 days')::int as "distinctPodcasts",
-      array_agg(distinct p.name) filter (where e.published_at >= now() - interval '30 days') as podcasts,
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '30 days')::int as "episodes30d",
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '7 days')::int as "episodesThisWeek",
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '14 days' and e.published_at < ${at} - interval '7 days')::int as "episodesPrevWeek",
+      count(distinct e.id) filter (where date_trunc('month', e.published_at at time zone 'Asia/Kolkata') = date_trunc('month', ${at} at time zone 'Asia/Kolkata'))::int as "episodesThisMonth",
+      count(distinct e.podcast_id) filter (where e.published_at >= ${at} - interval '30 days')::int as "distinctPodcasts",
+      array_agg(distinct p.name) filter (where e.published_at >= ${at} - interval '30 days') as podcasts,
       max(e.published_at) as "lastAt",
-      (avg(et.confidence) filter (where e.published_at >= now() - interval '30 days'))::float as confidence
+      (avg(et.confidence) filter (where e.published_at >= ${at} - interval '30 days'))::float as confidence
     from episode_topics et
     join topics tp on tp.id = et.topic_id
     join episodes e on e.id = et.episode_id
     join podcasts p on p.id = e.podcast_id and p.enabled
-    where e.published_at >= now() - interval '60 days' ${podcastFilter}
+    where e.published_at >= ${at} - interval '60 days' and e.published_at < ${at} ${podcastFilter}
     group by tp.id, tp.name`);
 
   const weekly = await rows<{ topicId: number; week: string; n: number }>(sql`
     select et.topic_id as "topicId", to_char(date_trunc('week', e.published_at at time zone 'Asia/Kolkata'), 'DD Mon') as week,
            date_trunc('week', e.published_at at time zone 'Asia/Kolkata') as wk, count(distinct e.id)::int as n
     from episode_topics et join episodes e on e.id = et.episode_id join podcasts p on p.id = e.podcast_id and p.enabled
-    where e.published_at >= date_trunc('week', now() at time zone 'Asia/Kolkata') - interval '7 weeks' ${podcastFilter}
+    where e.published_at >= date_trunc('week', ${at} at time zone 'Asia/Kolkata') - interval '7 weeks' and e.published_at < ${at} ${podcastFilter}
     group by 1, 2, wk order by wk`);
 
   const eps = await rows<{ topicId: number } & EpisodeRef>(sql`
@@ -216,11 +217,11 @@ export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusCon
       select et.topic_id as "topicId", e.title, e.url, p.name as podcast, e.published_at as at,
              row_number() over (partition by et.topic_id order by e.published_at desc) rn
       from episode_topics et join episodes e on e.id = et.episode_id join podcasts p on p.id = e.podcast_id and p.enabled
-      where e.published_at >= now() - interval '30 days' ${podcastFilter}
+      where e.published_at >= ${at} - interval '30 days' and e.published_at < ${at} ${podcastFilter}
     ) t where rn <= 6`);
 
   const weights = await getWeights("topic");
-  const now = new Date();
+  const now = opts.asOf ?? new Date();
   const out: TopicRow[] = base
     .filter((r) => Number(r.episodes30d) > 0)
     .map((r) => {
