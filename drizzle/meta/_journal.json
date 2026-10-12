@@ -64,6 +64,13 @@
       "when": 1791815047290,
       "tag": "0008_magical_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791815931780,
+      "tag": "0009_medical_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

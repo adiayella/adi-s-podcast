@@ -426,3 +426,49 @@ export const episodeTranscripts = pgTable(
   },
   (t) => [uniqueIndex("episode_transcripts_uq").on(t.episodeId, t.source), index("episode_transcripts_status_idx").on(t.status)],
 );
+
+// ---------- Phase 2: semantic clusters and audience questions ----------
+// Themes found by embedding episodes and grouping the ones that are close in meaning. Rebuilt each run; not the controlled topic list.
+export const topicClusters = pgTable("topic_clusters", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(), // named by Gemini from the member titles; the grouping itself is pure maths on embeddings
+  episodeIds: jsonb("episode_ids").notNull(), // number[]
+  podcastCount: integer("podcast_count").notNull(),
+  episodeCount: integer("episode_count").notNull(),
+  recentCount: integer("recent_count").notNull(), // episodes in the last 14 days
+  priorCount: integer("prior_count").notNull(), // episodes in the 14 days before that
+  cohesion: numeric("cohesion", { precision: 4, scale: 3 }).notNull(), // mean cosine similarity to the centroid
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// What a video's audience is asking, from a bounded sample of public top-level comments. The raw comments are NOT stored:
+// only counts, short verbatim excerpts (no author) and the AI's labels, each kept apart so findings and interpretation never blur.
+export const audienceFindings = pgTable(
+  "audience_findings",
+  {
+    id: serial("id").primaryKey(),
+    episodeSourceId: integer("episode_source_id").notNull().references(() => episodeSources.id, { onDelete: "cascade" }),
+    sampleSize: integer("sample_size").notNull(), // comments actually read
+    totalComments: integer("total_comments"), // the video's public comment count
+    items: jsonb("items").notNull(), // verified items: { kind, label, support, quotes[], aiInterview? }
+    rejected: integer("rejected").notNull().default(0), // items dropped because their comment ids did not exist
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    analysedAt: timestamp("analysed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("audience_findings_source_uq").on(t.episodeSourceId)],
+);
+
+// Findings from many videos merged by meaning (embedding clusters), so "how do I get my first customers" asked on
+// three shows counts once with its combined support.
+export const audienceThemes = pgTable("audience_themes", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(), // question | concern | topic_request
+  label: text("label").notNull(),
+  support: integer("support").notNull(), // comments backing it, summed over videos
+  videos: integer("videos").notNull(),
+  podcasts: jsonb("podcasts").notNull(), // string[]
+  quotes: jsonb("quotes").notNull(), // up to 3 verbatim excerpts
+  interviewQuestions: jsonb("interview_questions").notNull(), // AI-SUGGESTED, labelled as such in the UI
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+});

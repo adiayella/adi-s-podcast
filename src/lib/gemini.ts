@@ -55,3 +55,34 @@ export async function generateJson(opts: {
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
+
+/** L2-normalise: gemini-embedding-001 only returns unit-length vectors at full size, so truncated 768-d vectors are rescaled. */
+export function normalizeVector(v: number[]): number[] {
+  const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;
+  return v.map((x) => x / norm);
+}
+
+/** Embed texts (batches of up to 100) as 768-dimension unit vectors, with backoff on rate limits. */
+export async function embedTexts(texts: string[], taskType: "CLUSTERING" | "SEMANTIC_SIMILARITY" = "CLUSTERING"): Promise<number[][]> {
+  const out: number[][] = [];
+  for (let i = 0; i < texts.length; i += 100) {
+    const batch = texts.slice(i, i + 100);
+    let lastError: unknown;
+    let done = false;
+    for (let attempt = 0; attempt < 5 && !done; attempt++) {
+      try {
+        const res = await ai().models.embedContent({ model: EMBEDDING_MODEL, contents: batch, config: { outputDimensionality: EMBEDDING_DIMENSIONS, taskType } });
+        const vectors = (res.embeddings ?? []).map((e) => normalizeVector(e.values ?? []));
+        if (vectors.length !== batch.length) throw new Error(`Expected ${batch.length} embeddings, got ${vectors.length}`);
+        out.push(...vectors);
+        done = true;
+      } catch (e) {
+        lastError = e;
+        if (!isRetryable(e)) throw e;
+        await sleep(1500 * 2 ** attempt + Math.random() * 500);
+      }
+    }
+    if (!done) throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+  return out;
+}

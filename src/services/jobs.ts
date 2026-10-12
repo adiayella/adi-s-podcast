@@ -6,6 +6,8 @@ import { analysisProgress, enqueueAnalysis, runAnalysisBatch } from "@/services/
 import { reportWeekStart } from "@/lib/weeks";
 import { checkDelivery, checkPendingDeliveries, generateBrief, sendBrief } from "@/services/brief";
 import { checkReadiness } from "@/services/readiness";
+import { buildAudienceThemes, runAudienceAnalysis } from "@/services/audience";
+import { buildClusters, embedMissingEpisodes } from "@/services/semantic";
 import { discoverCore } from "@/services/discovery";
 import { ingestAllEnabled } from "@/services/ingest";
 import { lastRealRun, tracked } from "@/services/job-log";
@@ -71,9 +73,19 @@ export function runFocused(opts: { force?: boolean; budgetMs?: number } = {}) {
     }
     d.analysed = processed;
     d.queue = await analysisProgress();
-
     d.resolved = await resolveAll();
     d.snapshot = await saveSnapshots();
+
+    // Phase 2 enrichment. Each step is optional: a failure is recorded and never blocks the data the Monday brief needs.
+    const optional = async <T>(name: string, fn: () => Promise<T>) => {
+      try {
+        d[name] = await fn();
+      } catch (e) {
+        d[name] = { error: e instanceof Error ? e.message.slice(0, 160) : String(e) };
+      }
+    };
+    await optional("semantic", async () => ({ ...(await embedMissingEpisodes()), ...(await buildClusters()) }));
+    await optional("audience", async () => ({ ...(await runAudienceAnalysis({ maxVideos: 4 })), ...(await buildAudienceThemes()) }));
 
     d.briefRetry = await retryBrief();
   });
