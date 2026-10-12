@@ -5,6 +5,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/db";
+import { requireAdmin, isAdmin } from "@/lib/admin";
 import { ingestPodcast } from "@/services/ingest";
 
 const { podcasts } = schema;
@@ -45,6 +46,7 @@ function parse(formData: FormData) {
 }
 
 export async function addPodcast(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await isAdmin())) return { ok: false, message: "Admin login required" };
   const parsed = parse(formData);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
   const { name, rssUrl, youtubeChannelId } = parsed.data;
@@ -67,6 +69,7 @@ export async function addPodcast(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function updatePodcast(formData: FormData) {
+  await requireAdmin();
   const id = Number(formData.get("id"));
   const parsed = parse(formData);
   if (!Number.isInteger(id) || !parsed.success) return;
@@ -80,6 +83,7 @@ export async function updatePodcast(formData: FormData) {
 }
 
 export async function setEnabled(formData: FormData) {
+  await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) return;
   await db.update(podcasts).set({ enabled: formData.get("enabled") === "true" }).where(eq(podcasts.id, id));
@@ -88,6 +92,7 @@ export async function setEnabled(formData: FormData) {
 }
 
 export async function deletePodcast(formData: FormData) {
+  await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) return;
   await db.delete(podcasts).where(eq(podcasts.id, id)); // episodes cascade
@@ -96,6 +101,7 @@ export async function deletePodcast(formData: FormData) {
 }
 
 export async function syncPodcast(formData: FormData) {
+  await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) return;
   const [p] = await db.select().from(podcasts).where(eq(podcasts.id, id));

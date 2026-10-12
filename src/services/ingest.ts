@@ -57,7 +57,8 @@ export async function ingestPodcast(
   const result: IngestResult = { podcastId: podcast.id, name: podcast.name, seen: 0, inserted: 0 };
   try {
     if (!podcast.rssUrl) throw new Error("No RSS URL configured");
-    const feed = await parser.parseURL(podcast.rssUrl);
+    // One retry: a single slow or flaky feed should not cost a whole day of data.
+    const feed = await parser.parseURL(podcast.rssUrl).catch(() => parser.parseURL(podcast.rssUrl!));
     const cutoff = Date.now() - sinceDays * 86_400_000;
 
     const rows = new Map<string, typeof episodes.$inferInsert & { guid: string }>();

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   FileText,
   Hash,
+  Lock,
   LayoutDashboard,
   Megaphone,
   Radio,
@@ -24,6 +25,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 const MANAGE: typeof NAV = [
   { href: "/podcasts", label: "Manage Podcasts", icon: Radio },
   { href: "/settings", label: "Data Sources", icon: Settings },
+  { href: "/admin", label: "Admin", icon: Lock },
 ];
 
 function NavLink({ href, label, icon: Icon }: (typeof NAV)[number]) {
