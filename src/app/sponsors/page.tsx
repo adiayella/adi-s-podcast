@@ -75,6 +75,7 @@ function Table({ rows, kind }: { rows: SponsorRow[]; kind: "disclosed" | "promo"
               <td className="px-3 py-3.5">
                 <p className="font-medium">{s.name}</p>
                 <p className="text-sm text-muted">{s.category ?? "Category unknown"}</p>
+                {s.focus && <div className="mt-1"><Badge tone="good">Matches your focus</Badge></div>}
               </td>
               <td className="px-3 py-3.5 tabular-nums">
                 {kind === "disclosed" ? (
@@ -112,8 +113,9 @@ async function Radar({ searchParams }: { searchParams: PageProps<"/sponsors">["s
   const sp = await searchParams;
   const get = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : (sp[k] as string | undefined));
   const period = parsePeriod(get("period") ?? "90d");
-  const [brands, podcasts] = await Promise.all([getSponsorRadar({ period, podcastId: get("podcast") ? Number(get("podcast")) : undefined }), getEnabledPodcasts()]);
-  const current = { period: get("period"), podcast: get("podcast") };
+  const prioritise = get("focus") !== "off";
+  const [brands, podcasts] = await Promise.all([getSponsorRadar({ period, podcastId: get("podcast") ? Number(get("podcast")) : undefined, prioritise }), getEnabledPodcasts()]);
+  const current = { period: get("period"), podcast: get("podcast"), focus: get("focus") };
   const disclosed = brands.filter((b) => b.confirmedEpisodes > 0);
   const promo = brands.filter((b) => b.confirmedEpisodes === 0).sort((a, b) => b.platformFlaggedEpisodes - a.platformFlaggedEpisodes || b.signal.score - a.signal.score);
   const flagged = brands.filter((b) => b.platformFlaggedEpisodes > 0).length;
@@ -127,7 +129,7 @@ async function Radar({ searchParams }: { searchParams: PageProps<"/sponsors">["s
           options={[{ value: "30d", label: "30 days" }, { value: "90d", label: "90 days" }]}
           hrefFor={(v) => withParam("/sponsors", current, "period", v)}
         />
-        <FilterForm basePath="/sponsors" params={current} podcasts={podcasts} podcast={get("podcast")} journalists={null} />
+        <FilterForm basePath="/sponsors" params={current} podcasts={podcasts} podcast={get("podcast")} journalists={null} prioritise={prioritise} />
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">

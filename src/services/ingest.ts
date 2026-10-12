@@ -20,7 +20,7 @@ export type IngestResult = {
   error?: string;
 };
 
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<br\s*\/?>|<\/p>|<\/li>|<\/div>/gi, "\n")
@@ -124,8 +124,10 @@ export async function ingestPodcast(
   return result;
 }
 
-export async function ingestAllEnabled(sinceDays: number): Promise<IngestResult[]> {
-  const list = await db.select().from(podcasts).where(eq(podcasts.enabled, true));
+export async function ingestAllEnabled(sinceDays: number, priorityIds: number[] = []): Promise<IngestResult[]> {
+  const found = await db.select().from(podcasts).where(eq(podcasts.enabled, true));
+  // the founder's priority shows are collected first, so they are never the ones cut off by a time limit
+  const list = [...found].sort((a, b) => Number(priorityIds.includes(b.id)) - Number(priorityIds.includes(a.id)));
   const results: IngestResult[] = [];
   for (const p of list) results.push(await ingestPodcast(p, sinceDays));
   return results;

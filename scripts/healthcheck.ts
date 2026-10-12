@@ -22,10 +22,10 @@ async function run(name: string, fn: () => Promise<[boolean, string?]>) {
 
 async function main() {
   // ---------------- database integrity
-  await run("DB: all 16 tables + pgvector present", async () => {
+  await run("DB: all 23 tables (monitored + research) and pgvector present", async () => {
     const t = await sql`select count(*)::int n from information_schema.tables where table_schema='public' and table_name not like '\\_\\_%'`;
     const v = await sql`select 1 from pg_extension where extname='vector'`;
-    return [Number(t[0].n) >= 16 && v.length === 1, `${t[0].n} tables`];
+    return [Number(t[0].n) >= 23 && v.length === 1, `${t[0].n} tables`];
   });
   await run("DB: no duplicate episodes (same show + title)", async () => {
     const r = await sql`select count(*)::int n from (select podcast_id, dedupe_key from episodes group by 1,2 having count(*)>1) d`;
@@ -71,6 +71,37 @@ async function main() {
     return [r.length === 1, r.length ? `latest status: ${r[0].email_status}` : "none"];
   });
 
+  await run("Research: an active settings version exists", async () => {
+    const r = await sql`select max(version)::int v, count(*)::int n from research_settings_versions`;
+    return [Number(r[0].v) >= 1, `active v${r[0].v}, ${r[0].n} versions kept`];
+  });
+  await run("Separation: no un-approved discovery candidate is on the watchlist", async () => {
+    const r = await sql`select count(*)::int n from discovery_candidates c join podcasts p on p.rss_url = c.rss_url where c.status <> 'approved'`;
+    return [Number(r[0].n) === 0, `${r[0].n} leaked`];
+  });
+  await run("Separation: approved candidates all point at a real watchlist podcast", async () => {
+    const r = await sql`select count(*)::int n from discovery_candidates where status = 'approved' and promoted_podcast_id is null`;
+    return [Number(r[0].n) === 0, `${r[0].n} approved without a podcast`];
+  });
+  await run("Discovery: every kept candidate has real episodes and an explanation", async () => {
+    const r = await sql`select count(*)::int n from discovery_candidates c where c.status in ('new','saved') and (coalesce(c.reason,'') = '' or not exists (select 1 from discovery_episodes e where e.candidate_id = c.id))`;
+    return [Number(r[0].n) === 0, `${r[0].n} without evidence`];
+  });
+  await run("Discovery: nothing is labelled trending without two or more signals", async () => {
+    const r = await sql`select count(*)::int n from discovery_candidates where trend_label = 'trending' and coalesce((trend_evidence->>'signalsMet')::int, 0) < 2`;
+    return [Number(r[0].n) === 0, `${r[0].n} violations`];
+  });
+  await run("Quota: YouTube units used today are within the daily research budget", async () => {
+    const used = await sql`select coalesce(sum(units), 0)::int u from api_usage where day = (now() at time zone 'utc')::date and provider = 'youtube'`;
+    const cfg = await sql`select config->>'quotaBudgetUnits' q from research_settings_versions order by version desc limit 1`;
+    const budget = Number(cfg[0]?.q ?? 3000);
+    return [Number(used[0].u) <= budget + 500, `${used[0].u} used of ${budget} (+500 for the focused job)`];
+  });
+  await run("Logs: focused and discovery runs are recorded separately", async () => {
+    const r = await sql`select count(*) filter (where job = 'focused')::int f, count(*) filter (where job = 'discovery')::int d from job_runs`;
+    return [Number(r[0].f) > 0 && Number(r[0].d) > 0, `focused ${r[0].f}, discovery ${r[0].d}`];
+  });
+
   // ---------------- integrations
   await run("Neon: reachable", async () => [(await sql`select 1 as x`)[0].x === 1]);
   await run("YouTube API: key works", async () => {
@@ -100,7 +131,7 @@ async function main() {
   const up = await fetch(base).then((r) => r.ok).catch(() => false);
   check("App: server reachable", up, base);
   if (up) {
-    const pages: [string, string][] = [["/", "Overview"], ["/guests", "Guest Radar"], ["/topics", "Topic Radar"], ["/sponsors", "Sponsor Radar"], ["/brief", "Weekly Intelligence Brief"], ["/podcasts", "Manage Podcasts"], ["/settings", "Data Sources"], ["/admin", "Admin"]];
+    const pages: [string, string][] = [["/", "Overview"], ["/guests", "Guest Radar"], ["/topics", "Topic Radar"], ["/sponsors", "Sponsor Radar"], ["/brief", "Weekly Intelligence Brief"], ["/research", "Research Control Center"], ["/research?tab=discovery", "Discovery status"], ["/settings", "Data Sources"], ["/admin", "Admin"]];
     for (const [path, text] of pages) {
       await run(`Page ${path}`, async () => {
         const r = await fetch(base + path);
@@ -108,11 +139,20 @@ async function main() {
         return [r.ok && html.includes(text) && !/Application error|Internal Server Error/i.test(html), `HTTP ${r.status}`];
       });
     }
-    await run("Cron: no token -> 401", async () => [(await fetch(`${base}/api/cron/daily`)).status === 401]);
+    await run("Cron: no token -> 401", async () => [(await fetch(`${base}/api/cron/focused`)).status === 401]);
     await run("Cron: wrong token -> 401", async () => [(await fetch(`${base}/api/cron/weekly`, { headers: { Authorization: "Bearer wrong" } })).status === 401]);
-    await run("Admin: public podcast page offers no edit controls", async () => {
-      const html = await (await fetch(`${base}/podcasts`)).text();
-      return [!html.includes("Add a podcast") && html.includes("Read-only view"), "read-only for visitors"];
+    await run("Admin: the public Research page is read-only (no add-podcast or save controls)", async () => {
+      const html = await (await fetch(`${base}/research?tab=focused`)).text();
+      return [!html.includes("Add a podcast") && html.includes("Read-only view") && html.includes("Sign in as admin"), "read-only for visitors"];
+    });
+    await run("Admin: the old /podcasts address redirects to the Research Center", async () => {
+      const r = await fetch(`${base}/podcasts`, { redirect: "manual" });
+      return [r.status >= 300 && r.status < 400 && (r.headers.get("location") ?? "").includes("/research"), `HTTP ${r.status}`];
+    });
+    await run("Cron: the new focused and discovery endpoints reject missing tokens", async () => {
+      const a = await fetch(`${base}/api/cron/focused`);
+      const b = await fetch(`${base}/api/cron/discovery`);
+      return [a.status === 401 && b.status === 401, `${a.status}/${b.status}`];
     });
   }
 

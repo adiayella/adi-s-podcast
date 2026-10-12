@@ -7,22 +7,45 @@ const API = "https://www.googleapis.com/youtube/v3";
 const MIN_EPISODE_SECONDS = 15 * 60; // shorter videos are clips/shorts, not full episodes
 const STOPWORDS = new Set(["the", "a", "an", "of", "and", "to", "in", "on", "for", "with", "is", "are", "how", "why", "what", "ft", "feat", "ep", "episode", "trs"]);
 
-type Video = {
+export type Video = {
   id: string;
   title: string;
   description: string;
   publishedAt: Date;
   seconds: number;
   paid: boolean;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
 };
 
-async function yt<T>(path: string, params: Record<string, string>): Promise<T> {
+// Quota metering: every call reports its cost (search = 100 units, anything else = 1). A caller can install a
+// meter that counts the units and throws once its budget is spent, so no job can run away with the daily quota.
+export class QuotaExceeded extends Error {
+  constructor(message = "YouTube quota budget for this run is spent") {
+    super(message);
+  }
+}
+let meter: ((units: number) => void) | null = null;
+export function setYoutubeMeter(fn: ((units: number) => void) | null) {
+  meter = fn;
+}
+
+export async function yt<T>(path: string, params: Record<string, string>): Promise<T> {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) throw new Error("YOUTUBE_API_KEY is not set");
+  meter?.(path === "search" ? 100 : 1);
   const url = `${API}/${path}?${new URLSearchParams({ ...params, key })}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`YouTube ${path} ${res.status}: ${(await res.text()).slice(0, 160)}`);
-  return res.json() as Promise<T>;
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) return res.json() as Promise<T>;
+    lastStatus = res.status;
+    // retry only transient failures, at most twice; a 403 quota error must not be retried
+    if (res.status !== 429 && res.status < 500) throw new Error(`YouTube ${path} ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+  }
+  throw new Error(`YouTube ${path} failed after retries (HTTP ${lastStatus})`);
 }
 
 function isoDurationToSeconds(d: string): number {
@@ -60,8 +83,9 @@ export async function fetchRecentVideos(channelId: string, sinceDays: number): P
         snippet: { title: string; description: string; publishedAt: string };
         contentDetails: { duration: string };
         paidProductPlacementDetails?: { hasPaidProductPlacement?: boolean };
+        statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
       }[];
-    }>("videos", { part: "snippet,contentDetails,paidProductPlacementDetails", id: batch.join(","), maxResults: "50" });
+    }>("videos", { part: "snippet,contentDetails,paidProductPlacementDetails,statistics", id: batch.join(","), maxResults: "50" });
     for (const v of r.items) {
       videos.push({
         id: v.id,
@@ -70,6 +94,9 @@ export async function fetchRecentVideos(channelId: string, sinceDays: number): P
         publishedAt: new Date(v.snippet.publishedAt),
         seconds: isoDurationToSeconds(v.contentDetails.duration),
         paid: v.paidProductPlacementDetails?.hasPaidProductPlacement === true,
+        views: v.statistics?.viewCount !== undefined ? Number(v.statistics.viewCount) : null,
+        likes: v.statistics?.likeCount !== undefined ? Number(v.statistics.likeCount) : null,
+        comments: v.statistics?.commentCount !== undefined ? Number(v.statistics.commentCount) : null,
       });
     }
   }

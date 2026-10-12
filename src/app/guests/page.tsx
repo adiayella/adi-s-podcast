@@ -33,9 +33,10 @@ async function Radar({ searchParams }: { searchParams: Search }) {
   const period = parsePeriod(get("period") ?? months[0]);
   const podcastId = get("podcast") ? Number(get("podcast")) : undefined;
   const journalists = get("journalists") === "1";
-  const current = { period: get("period"), podcast: get("podcast"), journalists: get("journalists") };
+  const prioritise = get("focus") !== "off";
+  const current = { period: get("period"), podcast: get("podcast"), journalists: get("journalists"), focus: get("focus") };
 
-  const guests = await getGuestRadar({ period, podcastId, includeJournalists: journalists });
+  const guests = await getGuestRadar({ period, podcastId, includeJournalists: journalists, prioritise });
   const repeat = guests.filter((g) => g.distinctPodcasts >= 2);
   const totalApps = guests.reduce((a, g) => a + g.appearances, 0);
   const collapsed = guests.reduce((a, g) => a + g.rawAppearances - g.appearances, 0);
@@ -47,7 +48,7 @@ async function Radar({ searchParams }: { searchParams: Search }) {
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs label="Period" options={options} current={tabValue} hrefFor={(v) => withParam("/guests", current, "period", v)} />
-        <FilterForm basePath="/guests" params={current} podcasts={podcasts} podcast={get("podcast")} journalists={journalists} />
+        <FilterForm basePath="/guests" params={current} podcasts={podcasts} podcast={get("podcast")} journalists={journalists} prioritise={prioritise} />
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
@@ -88,6 +89,7 @@ async function Radar({ searchParams }: { searchParams: Search }) {
                     <p className="font-medium">{g.name}</p>
                     <p className="text-sm text-muted">{[g.role, g.company].filter(Boolean).join(" · ") || "Role not stated"}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {g.focus && <Badge tone="good">Matches your focus</Badge>}
                       {g.category && <Badge>{g.category}</Badge>}
                       {g.repeatThisMonth && <Badge tone="good">Repeat this month</Badge>}
                       {g.newFace && <Badge tone="warn">New to radar</Badge>}

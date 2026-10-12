@@ -10,12 +10,14 @@ export function FilterForm({
   podcasts,
   podcast,
   journalists,
+  prioritise,
 }: {
   basePath: string;
   params: Record<string, string | undefined>;
   podcasts: { id: number; name: string }[];
   podcast?: string;
   journalists?: boolean | null; // null = hide the toggle
+  prioritise?: boolean | null; // put items that match the founder's focus first; null = hide the toggle
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -41,6 +43,12 @@ export function FilterForm({
           </option>
         ))}
       </select>
+      {prioritise !== null && prioritise !== undefined && (
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={prioritise} onChange={(e) => go({ focus: e.target.checked ? undefined : "off" })} className="size-4 accent-[#5b6cf0]" />
+          Prioritise my interests
+        </label>
+      )}
       {journalists !== null && journalists !== undefined && (
         <label className="flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={journalists} onChange={(e) => go({ journalists: e.target.checked ? "1" : undefined })} className="size-4 accent-[#5b6cf0]" />

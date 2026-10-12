@@ -1,49 +1,59 @@
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { withYoutubeBudget } from "@/lib/api-budget";
+import { effortBudget, isDue } from "@/research/config";
 import { analysisProgress, enqueueAnalysis, runAnalysisBatch } from "@/services/analyze";
 import { generateBrief, sendBrief } from "@/services/brief";
+import { discoverCore } from "@/services/discovery";
 import { ingestAllEnabled } from "@/services/ingest";
+import { lastRealRun, tracked } from "@/services/job-log";
+import { getActiveConfig } from "@/services/research-settings";
 import { resolveAll } from "@/services/resolve";
 import { saveSnapshots } from "@/services/snapshots";
 import { syncYoutube } from "@/services/youtube";
 
-const { jobRuns, podcasts } = schema;
+export { recentRuns } from "@/services/job-log";
 
-type Detail = Record<string, unknown>;
-
-/** Runs `fn`, records start, finish, status and detail in job_runs, and never throws (cron must always answer). */
-async function tracked(job: string, fn: (detail: Detail) => Promise<void>): Promise<{ ok: boolean; detail: Detail }> {
-  const [run] = await db.insert(jobRuns).values({ job }).returning({ id: jobRuns.id });
-  const detail: Detail = {};
-  let ok = true;
-  try {
-    await fn(detail);
-  } catch (e) {
-    ok = false;
-    detail.error = e instanceof Error ? e.message : String(e);
-  }
-  await db.update(jobRuns).set({ finishedAt: new Date(), status: ok ? "ok" : "error", detail }).where(eq(jobRuns.id, run.id));
-  return { ok, detail };
-}
+const { podcasts } = schema;
 
 // Stay inside the 300 s Vercel limit with headroom.
 const BUDGET_MS = 240_000;
 
-/** Daily: collect new episodes, analyse them, refresh entities, scores and any unsent brief. Safe to run repeatedly. */
-export function runDaily() {
-  return tracked("daily", async (d) => {
+/**
+ * Focused Research: monitor the founder's podcast watchlist. Reads the research settings at run time, so a
+ * changed priority list, frequency, date range or mode switch applies to the very next run. Safe to repeat.
+ */
+export function runFocused(opts: { force?: boolean } = {}) {
+  return tracked("focused", async (d) => {
     const started = Date.now();
-    const ingest = await ingestAllEnabled(14);
+    const { version, config } = await getActiveConfig();
+    d.settingsVersion = version;
+    if (!config.modes.focused.enabled) {
+      d.skipped = "Focused mode is switched off";
+      return;
+    }
+    if (!opts.force && !isDue(config.frequency.focused, await lastRealRun("focused"))) {
+      d.skipped = `Not due yet (runs ${config.frequency.focused})`;
+      return;
+    }
+    d.priorityShows = config.priorityPodcastIds.length;
+
+    const ingest = await ingestAllEnabled(14, config.priorityPodcastIds);
     d.ingest = { podcasts: ingest.length, newEpisodes: ingest.reduce((a, r) => a + r.inserted, 0), failed: ingest.filter((r) => r.error).map((r) => `${r.name}: ${r.error}`) };
 
-    const withChannel = await db.select().from(podcasts).where(eq(podcasts.enabled, true));
+    // YouTube enrichment, metered so its quota use is recorded next to discovery's
+    const limit = Math.max(300, effortBudget(config).focusedYoutubeUnits);
+    const monitored = await db.select().from(podcasts).where(eq(podcasts.enabled, true));
     let matched = 0;
-    for (const p of withChannel.filter((x) => x.youtubeChannelId)) {
-      const r = await syncYoutube(p, 14);
-      matched += r.matched;
-      if (r.error) ((d.youtubeErrors as string[]) ??= []).push(`${p.name}: ${r.error}`);
-    }
+    const yt = await withYoutubeBudget(limit, async () => {
+      for (const p of monitored.filter((x) => x.youtubeChannelId)) {
+        const r = await syncYoutube(p, 14);
+        matched += r.matched;
+        if (r.error) ((d.youtubeErrors as string[]) ??= []).push(`${p.name}: ${r.error}`);
+      }
+    });
     d.youtubeMatched = matched;
+    d.youtubeUnits = yt.spent;
 
     d.queued = await enqueueAnalysis();
     let processed = 0;
@@ -64,6 +74,11 @@ export function runDaily() {
   });
 }
 
+/** Discovery Research: look for new podcasts and opportunities outside the watchlist. Never changes the watchlist itself. */
+export function runDiscovery(opts: { force?: boolean } = {}) {
+  return tracked("discovery", (d) => discoverCore(d, opts));
+}
+
 /** Weekly (Monday morning IST): build the brief from current data and email it. */
 export function runWeekly(opts: { force?: boolean } = {}) {
   return tracked("weekly", async (d) => {
@@ -71,8 +86,4 @@ export function runWeekly(opts: { force?: boolean } = {}) {
     d.brief = gen;
     d.email = await sendBrief({ reportId: gen.id, force: opts.force });
   });
-}
-
-export async function recentRuns(limit = 10) {
-  return db.select().from(jobRuns).orderBy(desc(jobRuns.startedAt)).limit(limit);
 }

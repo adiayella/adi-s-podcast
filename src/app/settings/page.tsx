@@ -49,43 +49,60 @@ function maskEmail(e: string | null) {
   return `${u.slice(0, 2)}***@${d}`;
 }
 
-async function Delivery() {
-  await connection();
-  const [to, runs] = await Promise.all([getRecipient(), recentRuns(8)]);
+type Run = Awaited<ReturnType<typeof recentRuns>>[number];
+
+function RunLog({ title, runs }: { title: string; runs: Run[] }) {
   return (
-    <div className="grid gap-5">
-      <Panel title="Schedule and delivery">
-        <ul className="grid gap-2.5 text-[15px]">
-          <li className="flex justify-between gap-4"><span className="text-muted">Daily collection and analysis</span><span>05:00 IST (Vercel Cron, 23:30 UTC)</span></li>
-          <li className="flex justify-between gap-4"><span className="text-muted">Monday brief</span><span>06:00 IST, Mondays (00:30 UTC)</span></li>
-          <li className="flex justify-between gap-4"><span className="text-muted">Brief recipient</span><span>{maskEmail(to)}</span></li>
-        </ul>
-        <p className="mt-3 text-sm text-muted">
-          Times are set in <code>vercel.json</code>. On the Hobby plan Vercel starts a daily job at some point within the hour, so the brief lands between
-          06:00 and 06:59 IST, well before 08:00. Email runs in Resend test mode, which delivers only to the account owner&apos;s address.
-        </p>
-      </Panel>
-      <Panel title="Recent scheduled runs">
-        {runs.length === 0 ? (
-          <p className="text-muted">No scheduled run has happened yet.</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {runs.map((r) => (
+    <Panel title={title}>
+      {runs.length === 0 ? (
+        <p className="text-muted">No run recorded yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {runs.map((r) => {
+            const d = (r.detail ?? {}) as { error?: string; skipped?: string };
+            return (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div>
-                  <p className="font-medium capitalize">{r.job}</p>
                   <p className="text-sm text-muted">
                     {formatDateTimeIST(r.startedAt)} IST · {timeAgo(r.startedAt)}
                     {r.finishedAt ? ` · took ${Math.round((new Date(r.finishedAt).getTime() - new Date(r.startedAt).getTime()) / 1000)}s` : ""}
                   </p>
-                  {r.status === "error" && <p className="mt-1 text-sm text-bad">{String((r.detail as { error?: string } | null)?.error ?? "failed")}</p>}
+                  {d.skipped && <p className="mt-0.5 text-sm text-muted">Skipped: {d.skipped}</p>}
+                  {r.status === "error" && <p className="mt-1 text-sm text-bad">{String(d.error ?? "failed")}</p>}
                 </div>
-                <Badge tone={r.status === "ok" ? "good" : r.status === "error" ? "bad" : "neutral"}>{r.status}</Badge>
+                <Badge tone={d.skipped ? "neutral" : r.status === "ok" ? "good" : r.status === "error" ? "bad" : "neutral"}>{d.skipped ? "skipped" : r.status}</Badge>
               </li>
-            ))}
-          </ul>
-        )}
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+async function Delivery() {
+  await connection();
+  const [to, focused, discovery, weekly] = await Promise.all([getRecipient(), recentRuns("focused", 5), recentRuns("discovery", 5), recentRuns("weekly", 5)]);
+  return (
+    <div className="grid gap-5">
+      <Panel title="Schedule and delivery">
+        <ul className="grid gap-2.5 text-[15px]">
+          <li className="flex justify-between gap-4"><span className="text-muted">Focused research</span><span>05:00 IST daily (runs as often as your setting allows)</span></li>
+          <li className="flex justify-between gap-4"><span className="text-muted">Discovery research</span><span>04:00 IST daily (runs as often as your setting allows)</span></li>
+          <li className="flex justify-between gap-4"><span className="text-muted">Monday brief</span><span>06:00 IST, Mondays</span></li>
+          <li className="flex justify-between gap-4"><span className="text-muted">Brief recipient</span><span>{maskEmail(to)}</span></li>
+        </ul>
+        <p className="mt-3 text-sm text-muted">
+          Cron times are set in <code>vercel.json</code>. Each research mode checks your saved frequency on every call and skips if it is not due yet.
+          On the Hobby plan Vercel starts a daily job within the hour, so the brief lands between 06:00 and 06:59 IST, before 08:00. Email runs in Resend
+          test mode, which delivers only to the account owner&apos;s address.
+        </p>
       </Panel>
+      <div className="grid gap-5 xl:grid-cols-3">
+        <RunLog title="Focused research runs" runs={focused} />
+        <RunLog title="Discovery research runs" runs={discovery} />
+        <RunLog title="Weekly brief runs" runs={weekly} />
+      </div>
     </div>
   );
 }

@@ -246,3 +246,114 @@ export const settings = pgTable("settings", {
 });
 
 export const enablePgvector = sql`CREATE EXTENSION IF NOT EXISTS vector`;
+
+// =====================================================================================
+// Research Control Center
+// Monitored universe = podcasts/episodes above. Discovery universe = the tables below.
+// They never share rows, so cross-show counts and rankings cannot mix the two.
+// =====================================================================================
+
+// Founder's research preferences, one row per saved version. The active version is the highest number.
+export const researchSettingsVersions = pgTable("research_settings_versions", {
+  id: serial("id").primaryKey(),
+  version: integer("version").notNull().unique(),
+  config: jsonb("config").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const discoveryCandidates = pgTable(
+  "discovery_candidates",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(), // normalised name: the same show found twice is one row
+    publisher: text("publisher"),
+    source: text("source").notNull(), // 'apple' | 'youtube'
+    appleId: text("apple_id").unique(),
+    rssUrl: text("rss_url").unique(),
+    youtubeChannelId: text("youtube_channel_id").unique(),
+    language: text("language"),
+    country: text("country"),
+    genre: text("genre"),
+    // 'new' | 'saved' | 'approved' | 'dismissed' | 'excluded'. Only the founder can move a candidate to 'approved'.
+    status: text("status").notNull().default("new"),
+    foundVia: text("found_via"),
+    metrics: jsonb("metrics"), // publishing activity computed from the real feed
+    engagement: jsonb("engagement"), // YouTube views/likes/comments where a channel is known
+    relevance: real("relevance"),
+    relevanceDetail: jsonb("relevance_detail"),
+    trendLabel: text("trend_label"), // 'trending' | 'emerging' | 'active' | 'inactive'
+    trendEvidence: jsonb("trend_evidence"),
+    reason: text("reason"),
+    evidenceEpisodes: jsonb("evidence_episodes"),
+    promotedPodcastId: integer("promoted_podcast_id").references(() => podcasts.id, { onDelete: "set null" }),
+    decisionNote: text("decision_note"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("discovery_candidates_name_key_uq").on(t.nameKey), index("discovery_candidates_status_idx").on(t.status)],
+);
+
+// One row per evaluation, so growth can be judged over time and not from a single look.
+export const discoveryCandidateSnapshots = pgTable(
+  "discovery_candidate_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    candidateId: integer("candidate_id").notNull().references(() => discoveryCandidates.id, { onDelete: "cascade" }),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+    metrics: jsonb("metrics").notNull(),
+  },
+  (t) => [index("discovery_snapshots_candidate_idx").on(t.candidateId, t.takenAt)],
+);
+
+export const discoveryEpisodes = pgTable(
+  "discovery_episodes",
+  {
+    id: serial("id").primaryKey(),
+    candidateId: integer("candidate_id").notNull().references(() => discoveryCandidates.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    url: text("url"),
+    dedupeKey: text("dedupe_key").notNull(),
+    views: integer("views"),
+    likes: integer("likes"),
+    comments: integer("comments"),
+  },
+  (t) => [uniqueIndex("discovery_episodes_uq").on(t.candidateId, t.dedupeKey), index("discovery_episodes_published_idx").on(t.publishedAt)],
+);
+
+// Gemini extraction for discovery episodes, stored apart from analysis_jobs (which belongs to monitored episodes).
+export const discoveryAnalyses = pgTable(
+  "discovery_analyses",
+  {
+    id: serial("id").primaryKey(),
+    discoveryEpisodeId: integer("discovery_episode_id").notNull().references(() => discoveryEpisodes.id, { onDelete: "cascade" }),
+    promptVersion: text("prompt_version").notNull(),
+    raw: jsonb("raw").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("discovery_analyses_uq").on(t.discoveryEpisodeId, t.promptVersion)],
+);
+
+// Cache for external search/lookup responses, so repeated runs do not spend quota on the same question.
+export const apiCache = pgTable("api_cache", {
+  key: text("key").primaryKey(),
+  payload: jsonb("payload").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+// Daily quota accounting per provider (YouTube Data API units).
+export const apiUsage = pgTable(
+  "api_usage",
+  {
+    id: serial("id").primaryKey(),
+    day: date("day").notNull(),
+    provider: text("provider").notNull(),
+    units: integer("units").notNull().default(0),
+  },
+  (t) => [uniqueIndex("api_usage_day_provider_uq").on(t.day, t.provider)],
+);

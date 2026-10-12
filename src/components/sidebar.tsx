@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Compass,
   FileText,
   Hash,
   Lock,
@@ -23,7 +24,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 ];
 
 const MANAGE: typeof NAV = [
-  { href: "/podcasts", label: "Manage Podcasts", icon: Radio },
+  { href: "/research", label: "Research Center", icon: Compass },
   { href: "/settings", label: "Data Sources", icon: Settings },
   { href: "/admin", label: "Admin", icon: Lock },
 ];

@@ -24,7 +24,11 @@
     "resolve": "tsx scripts/resolve.ts",
     "snapshot": "tsx scripts/snapshot.ts",
     "brief": "tsx scripts/brief.ts",
-    "healthcheck": "tsx scripts/healthcheck.ts"
+    "healthcheck": "tsx scripts/healthcheck.ts",
+    "discovery": "tsx scripts/discovery.ts",
+    "focused": "tsx scripts/focused.ts",
+    "reevaluate": "tsx scripts/reevaluate.ts",
+    "research-e2e": "tsx scripts/research-e2e.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

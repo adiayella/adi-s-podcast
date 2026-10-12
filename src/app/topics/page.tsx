@@ -37,13 +37,14 @@ async function Radar({ searchParams }: { searchParams: PageProps<"/topics">["sea
   await connection();
   const sp = await searchParams;
   const podcast = Array.isArray(sp.podcast) ? sp.podcast[0] : sp.podcast;
-  const [topics, podcasts] = await Promise.all([getTopicRadar({ podcastId: podcast ? Number(podcast) : undefined }), getEnabledPodcasts()]);
+  const prioritise = (Array.isArray(sp.focus) ? sp.focus[0] : sp.focus) !== "off";
+  const [topics, podcasts] = await Promise.all([getTopicRadar({ podcastId: podcast ? Number(podcast) : undefined, prioritise }), getEnabledPodcasts()]);
   const rising = topics.filter((t) => t.trend === "rising" || t.trend === "new");
   const multi = topics.filter((t) => t.distinctPodcasts >= 3);
 
   return (
     <div className="grid gap-5">
-      <FilterForm basePath="/topics" params={{ podcast }} podcasts={podcasts} podcast={podcast} journalists={null} />
+      <FilterForm basePath="/topics" params={{ podcast, focus: prioritise ? undefined : "off" }} podcasts={podcasts} podcast={podcast} journalists={null} prioritise={prioritise} />
 
       <div className="grid gap-5 md:grid-cols-3">
         <KpiCard label="Topics active (30d)" value={topics.length} icon={Hash} hint="From a fixed list of 20 topics" />
@@ -77,6 +78,7 @@ async function Radar({ searchParams }: { searchParams: PageProps<"/topics">["sea
                   <td className="px-3 py-3.5 text-muted tabular-nums">{t.rank}</td>
                   <td className="px-3 py-3.5">
                     <p className="font-medium">{t.name}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">{t.focus && <Badge tone="good">Matches your focus</Badge>}{t.unexpected && (t.trend === "rising" || t.trend === "new") && <Badge tone="warn">Unexpected trend</Badge>}</div>
                     <p className="text-xs text-muted">last episode {formatDateIST(t.lastAt)}</p>
                   </td>
                   <td className="px-3 py-3.5">

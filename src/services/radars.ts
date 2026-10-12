@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { DEFAULT_WEIGHTS, type RadarKind } from "@/lib/scoring-config";
+import { brandMatchesFocus, guestMatchesFocus, isUnexpectedTopic, matchedInterests } from "@/research/focus";
+import { getFocusContext, notExcluded, type FocusContext } from "@/services/focus-context";
 import {
   guestScore,
   outreachTier,
@@ -40,7 +42,8 @@ export function parsePeriod(raw: string | string[] | undefined, now = new Date()
     const label = start.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
     return { key: `${m[1]}-${m[2]}`, label, start, end: end > now ? new Date(now.getTime() + 1000) : end, calendarMonth: true };
   }
-  const n = v === "30d" ? 30 : v === "7d" ? 7 : 90;
+  const rolling = v ? /^(\d{1,3})d$/.exec(v) : null;
+  const n = rolling ? Math.min(365, Math.max(1, Number(rolling[1]))) : 90;
   return { key: `${n}d`, label: `Last ${n} days`, start: new Date(now.getTime() - n * DAY), end: new Date(now.getTime() + 1000), calendarMonth: false };
 }
 
@@ -78,21 +81,23 @@ export type GuestRow = {
   newFace: boolean;
   repeatThisMonth: boolean;
   likelyStaff: boolean;
+  focus: boolean; // matches the founder's preferences
 };
 
-export async function getGuestRadar(opts: { period: Period; podcastId?: number; includeJournalists?: boolean }): Promise<GuestRow[]> {
+export async function getGuestRadar(opts: { period: Period; podcastId?: number; includeJournalists?: boolean; focus?: FocusContext; prioritise?: boolean }): Promise<GuestRow[]> {
   const { period, podcastId, includeJournalists } = opts;
+  const fx = opts.focus ?? (await getFocusContext());
   const start = period.start.toISOString();
   const end = period.end.toISOString();
   const podcastFilter = podcastId ? sql`and e.podcast_id = ${podcastId}` : sql``;
   const res = await rows<Record<string, unknown>>(sql`
     with apps as (
-      select ga.guest_id, e.podcast_id, p.name as podcast, e.title, e.url, e.published_at, ga.confidence, ga.evidence_text,
+      select ga.guest_id, e.id as episode_id, e.podcast_id, p.name as podcast, e.title, e.url, e.published_at, ga.confidence, ga.evidence_text,
              lag(e.published_at) over (partition by ga.guest_id, e.podcast_id order by e.published_at) as prev
       from guest_appearances ga
       join episodes e on e.id = ga.episode_id
       join podcasts p on p.id = e.podcast_id and p.enabled
-      where e.published_at >= ${start}::timestamptz and e.published_at < ${end}::timestamptz ${podcastFilter}
+      where e.published_at >= ${start}::timestamptz and e.published_at < ${end}::timestamptz ${podcastFilter} ${notExcluded(sql`e.id`, fx.excluded)}
     ), kept as (
       -- the same guest on the same show within 7 days is one appearance (re-uploads, trailers)
       select * from apps where prev is null or published_at - prev >= interval '7 days'
@@ -105,7 +110,7 @@ export async function getGuestRadar(opts: { period: Period; podcastId?: number; 
            max(k.published_at) as "lastAt",
            (select min(e2.published_at) from guest_appearances ga2 join episodes e2 on e2.id = ga2.episode_id where ga2.guest_id = g.id) as "firstSeen",
            avg(k.confidence)::float as confidence,
-           json_agg(json_build_object('title', k.title, 'url', k.url, 'podcast', k.podcast, 'at', k.published_at, 'evidence', k.evidence_text)
+           json_agg(json_build_object('eid', k.episode_id, 'title', k.title, 'url', k.url, 'podcast', k.podcast, 'at', k.published_at, 'evidence', k.evidence_text)
                     order by k.published_at desc) as episodes
     from kept k join guests g on g.id = k.guest_id
     where ${includeJournalists ? sql`true` : sql`coalesce(g.category, '') <> 'journalist'`}
@@ -147,9 +152,11 @@ export async function getGuestRadar(opts: { period: Period; podcastId?: number; 
       repeatThisMonth: period.calendarMonth && Number(r.distinctPodcasts) >= 2,
       // appears again and again on one show only: more likely a regular contributor than a bookable guest
       likelyStaff: Number(r.appearances) >= 4 && Number(r.distinctPodcasts) === 1,
+      focus: guestMatchesFocus({ name: r.name as string, company: r.company as string | null }, fx.config) || (r.episodes as (EpisodeRef & { eid: number })[]).some((e) => fx.matches.has(Number(e.eid))),
     };
   });
-  out.sort((a, b) => b.score.score - a.score.score || new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime() || a.name.localeCompare(b.name));
+  const prioritise = opts.prioritise !== false;
+  out.sort((a, b) => (prioritise ? Number(b.focus) - Number(a.focus) : 0) || b.score.score - a.score.score || new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime() || a.name.localeCompare(b.name));
   out.forEach((g, i) => (g.rank = i + 1));
   return out;
 }
@@ -172,10 +179,13 @@ export type TopicRow = {
   rank: number;
   momentumPct: number | null;
   trend: "rising" | "steady" | "falling" | "new";
+  focus: boolean; // a topic the founder asked for, or recent episodes that match their interests
+  unexpected: boolean; // not asked for and not excluded: a candidate for "unexpected trend"
 };
 
-export async function getTopicRadar(opts: { podcastId?: number } = {}): Promise<TopicRow[]> {
-  const podcastFilter = opts.podcastId ? sql`and e.podcast_id = ${opts.podcastId}` : sql``;
+export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusContext; prioritise?: boolean } = {}): Promise<TopicRow[]> {
+  const fx = opts.focus ?? (await getFocusContext());
+  const podcastFilter = sql`${opts.podcastId ? sql`and e.podcast_id = ${opts.podcastId}` : sql``} ${notExcluded(sql`e.id`, fx.excluded)}`;
   const base = await rows<Record<string, unknown>>(sql`
     select tp.id, tp.name,
       count(distinct e.id) filter (where e.published_at >= now() - interval '30 days')::int as "episodes30d",
@@ -236,9 +246,18 @@ export async function getTopicRadar(opts: { podcastId?: number } = {}): Promise<
         rank: 0,
         momentumPct: prev === 0 ? null : ((thisWeek - prev) / prev) * 100,
         trend: prev === 0 && thisWeek > 0 ? "new" : thisWeek > prev ? "rising" : thisWeek < prev ? "falling" : "steady",
+        focus:
+          (fx.config.categories as string[]).includes(r.name as string) ||
+          (fx.config.priorityTopics as string[]).includes(r.name as string) ||
+          eps.some((e) => Number(e.topicId) === Number(r.id) && matchedInterests(e.title, fx.config).length > 0),
+        unexpected: isUnexpectedTopic(r.name as string, fx.config),
       } satisfies TopicRow;
     });
-  out.sort((a, b) => b.score.score - a.score.score || b.distinctPodcasts - a.distinctPodcasts || a.name.localeCompare(b.name));
+  const prioritise = opts.prioritise !== false;
+  const visible = out.filter((t) => !(fx.config.excludedTopics as string[]).includes(t.name));
+  out.length = 0;
+  out.push(...visible);
+  out.sort((a, b) => (prioritise ? Number(b.focus) - Number(a.focus) : 0) || b.score.score - a.score.score || b.distinctPodcasts - a.distinctPodcasts || a.name.localeCompare(b.name));
   out.forEach((t, i) => (t.rank = i + 1));
   return out;
 }
@@ -263,12 +282,14 @@ export type SponsorRow = {
   signal: ScoreResult; // everything promotional, shown separately and labelled unverified
   tier: OutreachTier;
   rank: number;
+  focus: boolean; // a brand the founder named, or promoted on episodes that match their interests
 };
 
-export async function getSponsorRadar(opts: { period: Period; podcastId?: number }): Promise<SponsorRow[]> {
+export async function getSponsorRadar(opts: { period: Period; podcastId?: number; focus?: FocusContext; prioritise?: boolean }): Promise<SponsorRow[]> {
+  const fx = opts.focus ?? (await getFocusContext());
   const start = opts.period.start.toISOString();
   const end = opts.period.end.toISOString();
-  const podcastFilter = opts.podcastId ? sql`and e.podcast_id = ${opts.podcastId}` : sql``;
+  const podcastFilter = sql`${opts.podcastId ? sql`and e.podcast_id = ${opts.podcastId}` : sql``} ${notExcluded(sql`e.id`, fx.excluded)}`;
   const CONF = sql`se.classification in ('explicit_sponsor', 'paid_promotion')`;
   const res = await rows<Record<string, unknown>>(sql`
     select b.id, b.canonical_name as name, b.category,
@@ -282,7 +303,7 @@ export async function getSponsorRadar(opts: { period: Period; podcastId?: number
       max(e.published_at) filter (where ${CONF}) as "lastConfirmedAt",
       (avg(se.confidence) filter (where ${CONF}))::float as "confConfirmed",
       avg(se.confidence)::float as "confAll",
-      json_agg(json_build_object('podcast', p.name, 'title', e.title, 'url', e.url, 'at', e.published_at,
+      json_agg(json_build_object('eid', e.id, 'podcast', p.name, 'title', e.title, 'url', e.url, 'at', e.published_at,
                'class', se.classification, 'quote', se.evidence_quote, 'flag', se.platform_paid_flag, 'confidence', se.confidence)
                order by e.published_at desc) as evidence
     from sponsor_evidence se
@@ -321,9 +342,11 @@ export async function getSponsorRadar(opts: { period: Period; podcastId?: number
       signal,
       tier: outreachTier({ confirmedPodcasts: Number(r.confirmedPodcasts), confirmedEpisodes, platformFlaggedEpisodes: Number(r.platformFlaggedEpisodes), promoEpisodes: Number(r.promoEpisodes) }),
       rank: 0,
+      focus: brandMatchesFocus({ name: r.name as string, category: r.category as string | null }, fx.config) || (r.evidence as { eid: number }[]).some((e) => fx.matches.has(Number(e.eid))),
     };
   });
-  out.sort((a, b) => a.tier.localeCompare(b.tier) || b.score.score - a.score.score || b.signal.score - a.signal.score || a.name.localeCompare(b.name));
+  const prioritise = opts.prioritise !== false;
+  out.sort((a, b) => a.tier.localeCompare(b.tier) || (prioritise ? Number(b.focus) - Number(a.focus) : 0) || b.score.score - a.score.score || b.signal.score - a.signal.score || a.name.localeCompare(b.name));
   out.forEach((s, i) => (s.rank = i + 1));
   return out;
 }

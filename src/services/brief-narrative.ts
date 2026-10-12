@@ -11,6 +11,8 @@ export const narrativeSchema = z.object({
   topicAngles: z.array(z.object({ topic: z.string(), stance: z.enum(["ride", "counter"]), angles: z.array(z.string().max(220)).min(1).max(3) })).max(5),
   sponsorNotes: z.array(z.object({ brand: z.string(), why: z.string().max(400), pitch: z.string().max(300) })).max(5),
   actions: z.array(z.string().max(260)).max(6),
+  unexpectedNotes: z.array(z.object({ topic: z.string(), note: z.string().max(300) })).max(3).default([]),
+  discoveryNotes: z.array(z.object({ podcast: z.string(), why: z.string().max(400), nextStep: z.string().max(260) })).max(5).default([]),
 });
 export type Narrative = z.infer<typeof narrativeSchema>;
 
@@ -29,8 +31,10 @@ const jsonSchema = {
     },
     sponsorNotes: { type: "array", items: { type: "object", properties: { brand: { type: "string" }, why: { type: "string" }, pitch: { type: "string" } }, required: ["brand", "why", "pitch"] } },
     actions: { type: "array", items: { type: "string" } },
+    unexpectedNotes: { type: "array", items: { type: "object", properties: { topic: { type: "string" }, note: { type: "string" } }, required: ["topic", "note"] } },
+    discoveryNotes: { type: "array", items: { type: "object", properties: { podcast: { type: "string" }, why: { type: "string" }, nextStep: { type: "string" } }, required: ["podcast", "why", "nextStep"] } },
   },
-  required: ["summary", "guestNotes", "topicAngles", "sponsorNotes", "actions"],
+  required: ["summary", "guestNotes", "topicAngles", "sponsorNotes", "actions", "unexpectedNotes", "discoveryNotes"],
 } as const;
 
 const SYSTEM = `You write the commentary for a weekly intelligence brief for Aditya, host of a podcast for independent startup founders in India. You are given computed statistics about 10 monitored Indian startup and business podcasts as JSON.
@@ -43,6 +47,9 @@ Rules:
 - topicAngles: for each topic, choose stance "ride" (join the wave) or "counter" (take a different angle than the shows covering it) and give 1 to 3 concrete episode angles for a show about independent startup founders. Each angle must build on themes visible in that topic's sample episode titles; do not introduce statistics or specific policies that are not in the JSON.
 - sponsorNotes: for each brand in the JSON, say what the evidence shows and how to pitch. Be careful with wording: a brand with only promo links or codes is NOT a confirmed sponsor; say it is an unverified promotional signal. The YouTube paid-placement flag shows a video has paid promotion but does not name the advertiser. Only include brands from the JSON.
 - If an evidence flag says sufficient=false, say plainly that the evidence is thin instead of overstating it.
+- unexpectedNotes: for each item in stats.unexpected (topics rising in the monitored shows that the founder did not ask for), one note on why it may matter. Only use topics from stats.unexpected.
+- discoveryNotes: for each podcast in stats.discovery.candidates, explain in one or two sentences why it is worth the founder's review, using only the evidence in the JSON, and give one next step. These shows are NOT on the founder's watchlist; never describe them as monitored, and never mix their numbers with the monitored numbers. If stats.discovery.enabled is false or there are no candidates, return an empty list.
+- Stats about guests, topics and sponsors come from stats.focus.universe (the monitored shows). Stats under stats.discovery come from a separate universe.
 - actions: up to 5 short, specific next steps (who to contact, what to plan, which sponsor lead to prioritise), each grounded in the JSON.
 - summary: 2 to 3 plain sentences on the week. No hype.`;
 
@@ -68,6 +75,8 @@ export async function writeNarrative(stats: BriefStats): Promise<NarrativeResult
     const guestNames = new Set(stats.guests.map((g) => g.name));
     const topicNames = new Set(stats.topics.map((t) => t.name));
     const brandNames = new Set(stats.sponsors.map((s) => s.name));
+    const unexpectedNames = new Set((stats.unexpected ?? []).map((t) => t.name));
+    const candidateNames = new Set((stats.discovery?.candidates ?? []).map((c) => c.name));
 
     const keep = <T,>(items: T[], ok: (i: T) => boolean, label: (i: T) => string) =>
       items.filter((i) => {
@@ -82,6 +91,8 @@ export async function writeNarrative(stats: BriefStats): Promise<NarrativeResult
       topicAngles: keep(n.topicAngles, (t) => topicNames.has(t.topic) && grounded(t.angles.join(" "), payload), (t) => `topic angles: ${t.topic}`),
       sponsorNotes: keep(n.sponsorNotes, (s) => brandNames.has(s.brand) && grounded(s.why + s.pitch, payload), (s) => `sponsor note: ${s.brand}`),
       actions: keep(n.actions, (a) => grounded(a, payload), (a) => `action: ${a.slice(0, 40)}`),
+      unexpectedNotes: keep(n.unexpectedNotes, (u) => unexpectedNames.has(u.topic) && grounded(u.note, payload), (u) => `unexpected note: ${u.topic}`),
+      discoveryNotes: keep(n.discoveryNotes, (d) => candidateNames.has(d.podcast) && grounded(d.why + d.nextStep, payload), (d) => `discovery note: ${d.podcast}`),
     };
     if (!clean.summary) dropped.push("summary (ungrounded number)");
     return { narrative: clean, dropped, model: GEMINI_MODEL };
