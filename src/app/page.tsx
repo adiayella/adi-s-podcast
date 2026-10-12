@@ -7,7 +7,7 @@ import { ConvergenceHeatmap } from "@/components/convergence-heatmap";
 import { IntelligenceStrip } from "@/components/intelligence-strip";
 import { EngagementChart, EvidenceTabs, SectorExplorer } from "@/components/overview-charts";
 import { Sparkline } from "@/components/radar-ui";
-import { Badge, Panel, PanelSkeleton } from "@/components/ui";
+import { Panel, PanelSkeleton } from "@/components/ui";
 import { formatDateIST } from "@/lib/format";
 import { compact, getConvergenceHeatmap, getEngagement, getEvidenceReview, getGuestTimeline, getOverviewKpis, getRecommendations, getSectorSeries, getSponsorTable } from "@/services/overview";
 
@@ -138,8 +138,7 @@ async function Sponsors() {
               <th className="py-2 pr-3 font-medium">Sponsor</th>
               <th className="py-2 pr-3 font-medium">Category</th>
               <th className="py-2 pr-3 font-medium">Shows</th>
-              <th className="py-2 pr-3 font-medium">Episodes</th>
-              <th className="py-2 font-medium">Evidence</th>
+              <th className="py-2 font-medium">Episodes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -153,13 +152,12 @@ async function Sponsors() {
                 </td>
                 <td className="py-2.5 pr-3 text-muted">{s.category ?? "—"}</td>
                 <td className="py-2.5 pr-3 tabular-nums">{s.shows}</td>
-                <td className="py-2.5 pr-3 tabular-nums">{s.episodes}</td>
-                <td className="py-2.5">{s.kind === "disclosed" ? <Badge tone="good">disclosed</Badge> : <Badge tone="warn">promo link, unverified</Badge>}</td>
+                <td className="py-2.5 tabular-nums">{s.episodes}</td>
               </tr>
             ))}
             {!list.length && (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-muted">
+                <td colSpan={4} className="py-6 text-center text-muted">
                   No promotional evidence yet.
                 </td>
               </tr>
