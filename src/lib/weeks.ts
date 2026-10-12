@@ -33,3 +33,8 @@ export function istClock(now = new Date()): { weekday: number; hour: number; min
   const ist = new Date(now.getTime() + IST_MS);
   return { weekday: ist.getUTCDay(), hour: ist.getUTCHours(), minute: ist.getUTCMinutes() };
 }
+
+/** A brief generated before its week was over (an early or test run) is incomplete and must be rebuilt, even if it was sent. */
+export function generatedBeforeWeekEnded(generatedAt: Date | null | undefined, weekStart: string): boolean {
+  return !!generatedAt && generatedAt.getTime() < weekRange(weekStart).to.getTime();
+}

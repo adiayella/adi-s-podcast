@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, istClock, istWeekStart, reportWeekStart, weekRange } from "./weeks";
+import { addDays, generatedBeforeWeekEnded, istClock, istWeekStart, reportWeekStart, weekRange } from "./weeks";
 
 describe("IST week boundaries", () => {
   it("07:00 IST on Monday (01:30 UTC) reports the week that just ended", () => {
@@ -39,5 +39,20 @@ describe("IST week boundaries", () => {
   it("crosses month and year ends", () => {
     expect(addDays("2026-12-28", 7)).toBe("2027-01-04");
     expect(reportWeekStart(new Date("2027-01-04T01:30:00Z"))).toBe("2026-12-28");
+  });
+});
+
+describe("premature briefs", () => {
+  it("flags a brief generated before its week ended (the 12 Oct row that would have blocked 19 Oct)", () => {
+    expect(generatedBeforeWeekEnded(new Date("2026-10-12T01:57:57Z"), "2026-10-12")).toBe(true);
+  });
+  it("accepts a brief generated after its week ended", () => {
+    // week 5-11 Oct IST ends Monday 12 Oct 00:00 IST = 11 Oct 18:30 UTC
+    expect(generatedBeforeWeekEnded(new Date("2026-10-12T15:04:20Z"), "2026-10-05")).toBe(false);
+    expect(generatedBeforeWeekEnded(new Date("2026-10-11T18:30:00Z"), "2026-10-05")).toBe(false);
+    expect(generatedBeforeWeekEnded(new Date("2026-10-11T18:29:59Z"), "2026-10-05")).toBe(true);
+  });
+  it("treats a missing generation time as not premature", () => {
+    expect(generatedBeforeWeekEnded(null, "2026-10-05")).toBe(false);
   });
 });

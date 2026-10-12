@@ -3,7 +3,7 @@ import { db, schema } from "@/db";
 import { withYoutubeBudget } from "@/lib/api-budget";
 import { effortBudget, isDue } from "@/research/config";
 import { analysisProgress, enqueueAnalysis, runAnalysisBatch } from "@/services/analyze";
-import { reportWeekStart } from "@/lib/weeks";
+import { generatedBeforeWeekEnded, reportWeekStart } from "@/lib/weeks";
 import { checkDelivery, checkPendingDeliveries, generateBrief, sendBrief } from "@/services/brief";
 import { checkReadiness } from "@/services/readiness";
 import { buildAudienceThemes, runAudienceAnalysis } from "@/services/audience";
@@ -141,7 +141,11 @@ export function runWeekly(opts: { force?: boolean; now?: Date; deliveryWaitMs?: 
     d.weekStart = weekStart;
 
     const [existing] = await db.select().from(schema.weeklyReports).where(eq(schema.weeklyReports.weekStart, weekStart));
-    if (existing?.sendStatus === "accepted" && !opts.force) {
+    // A brief made before this week was over (an early or test run) is incomplete: rebuild and send it once now.
+    const premature = generatedBeforeWeekEnded(existing?.generatedAt, weekStart);
+    if (premature) d.rebuilt = "The stored brief was generated before the week ended; rebuilding it with the full week";
+    const redo = Boolean(opts.force) || premature;
+    if (existing?.sendStatus === "accepted" && !redo) {
       d.skipped = "This week's brief was already sent";
       d.delivery = await checkPendingDeliveries();
       return;
@@ -164,14 +168,14 @@ export function runWeekly(opts: { force?: boolean; now?: Date; deliveryWaitMs?: 
     }
 
     // 2. Generate (reuses an existing ready brief for the week).
-    const gen = await generateBrief({ force: opts.force, weekStart, now: opts.now, dataNotes: ready.ready ? [] : ready.notes });
+    const gen = await generateBrief({ force: redo, weekStart, now: opts.now, dataNotes: ready.ready ? [] : ready.notes });
     d.brief = gen;
 
     // 3. Send, with a few spaced retries for transient provider errors.
     let sent: Awaited<ReturnType<typeof sendBrief>> = { sent: false, reason: "not attempted" };
     for (const wait of [0, 4_000, 12_000]) {
       if (wait) await sleep(wait);
-      sent = await sendBrief({ reportId: gen.id, force: opts.force });
+      sent = await sendBrief({ reportId: gen.id, force: redo });
       if (sent.sent || sent.reason === "Already sent" || sent.reason?.includes("not configured")) break;
     }
     d.email = sent;
