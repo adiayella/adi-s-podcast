@@ -115,3 +115,8 @@ export async function buildAudienceThemes() {
 export async function topAudienceThemes(limit = 12) {
   return db.select().from(schema.audienceThemes).orderBy(sql`support desc`).limit(limit);
 }
+
+export async function audienceStats() {
+  const [r] = await rows<{ videos: number; sample: number; last: string | null }>(sql`select count(*)::int videos, coalesce(sum(sample_size), 0)::int sample, max(analysed_at) as last from audience_findings`);
+  return r ?? { videos: 0, sample: 0, last: null };
+}

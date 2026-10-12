@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { BarChart3, CalendarClock, FileText, Hash, Megaphone, Newspaper, PieChart, Radio, UserSearch, Clock } from "lucide-react";
 import { Badge, KpiCard, Panel, PanelSkeleton, PageHeader } from "@/components/ui";
 import { RangeTabs } from "@/components/range-tabs";
+import { IntelligenceStrip } from "@/components/intelligence-strip";
 import { ShareDonut, WeeklyEpisodesChart } from "@/components/charts";
 import { PublishingHeatmap } from "@/components/heatmap";
 import { formatDateIST, pctChange, timeAgo } from "@/lib/format";
@@ -22,6 +23,9 @@ export default function OverviewPage({ searchParams }: PageProps<"/">) {
     <>
       <Suspense fallback={<PanelSkeleton className="mb-6 h-20" />}>
         <Header searchParams={searchParams} />
+      </Suspense>
+      <Suspense fallback={<PanelSkeleton className="mb-5 h-40" />}>
+        <IntelligenceStrip />
       </Suspense>
       <Suspense fallback={<PanelSkeleton className="h-[420px]" />}>
         <Body searchParams={searchParams} />

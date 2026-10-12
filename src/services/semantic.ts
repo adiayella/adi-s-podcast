@@ -95,3 +95,19 @@ export async function buildClusters(now = new Date()) {
   if (inserts.length) await db.insert(schema.topicClusters).values(inserts);
   return { episodesConsidered: eps.length, clusters: inserts.length, naming: error ? `fallback labels (${error})` : "gemini", labels };
 }
+
+export type ClusterView = { id: number; label: string; podcastCount: number; episodeCount: number; recentCount: number; priorCount: number; cohesion: number; computedAt: Date; samples: { title: string; podcast: string; url: string | null }[] };
+
+/** Stored clusters with a few member episodes each, for display. */
+export async function listClusters(): Promise<ClusterView[]> {
+  const cl = await db.select().from(schema.topicClusters).orderBy(sql`episode_count desc`);
+  const out: ClusterView[] = [];
+  for (const c of cl) {
+    const ids = (c.episodeIds as number[]).slice(0, 4);
+    const samples = ids.length
+      ? await rows<{ title: string; podcast: string; url: string | null }>(sql`select e.title, p.name as podcast, e.url from episodes e join podcasts p on p.id = e.podcast_id where e.id in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) order by e.published_at desc`)
+      : [];
+    out.push({ id: c.id, label: c.label, podcastCount: c.podcastCount, episodeCount: c.episodeCount, recentCount: c.recentCount, priorCount: c.priorCount, cohesion: Number(c.cohesion), computedAt: c.computedAt, samples });
+  }
+  return out;
+}

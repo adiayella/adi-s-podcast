@@ -6,6 +6,9 @@ import {
   Compass,
   FileText,
   Hash,
+  Layers,
+  MessageCircleQuestion,
+  Scale,
   Lock,
   LayoutDashboard,
   Megaphone,
@@ -20,11 +23,14 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/guests", label: "Guest Radar", icon: UserSearch },
   { href: "/topics", label: "Topic Radar", icon: Hash },
   { href: "/sponsors", label: "Sponsor Radar", icon: Megaphone },
+  { href: "/sectors", label: "Sector Intelligence", icon: Layers },
+  { href: "/audience", label: "Audience Questions", icon: MessageCircleQuestion },
   { href: "/brief", label: "Weekly Brief", icon: FileText },
 ];
 
 const MANAGE: typeof NAV = [
   { href: "/research", label: "Research Center", icon: Compass },
+  { href: "/rubrics", label: "Scoring Rubrics", icon: Scale },
   { href: "/settings", label: "Data Sources", icon: Settings },
   { href: "/admin", label: "Admin", icon: Lock },
 ];
