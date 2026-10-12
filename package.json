@@ -23,7 +23,8 @@
     "test": "vitest run",
     "resolve": "tsx scripts/resolve.ts",
     "snapshot": "tsx scripts/snapshot.ts",
-    "brief": "tsx scripts/brief.ts"
+    "brief": "tsx scripts/brief.ts",
+    "healthcheck": "tsx scripts/healthcheck.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

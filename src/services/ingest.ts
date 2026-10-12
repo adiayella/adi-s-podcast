@@ -85,7 +85,7 @@ export async function ingestPodcast(
     result.seen = rows.size;
 
     if (rows.size) {
-      const values = [...rows.values()].map(({ guid: _guid, ...r }) => r);
+      const values = [...rows.values()].map((r) => ({ podcastId: r.podcastId, title: r.title, description: r.description, publishedAt: r.publishedAt, url: r.url, dedupeKey: r.dedupeKey }));
       const inserted = await db
         .insert(episodes)
         .values(values)

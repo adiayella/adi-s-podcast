@@ -6,6 +6,8 @@ import { generateBrief, sendBrief } from "@/services/brief";
 
 export type BriefActionState = { ok: boolean; message: string } | null;
 
+// useActionState passes the previous state as the first argument; it is not needed here.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function generateNow(_prev: BriefActionState): Promise<BriefActionState> {
   await requireAdmin();
   try {
@@ -17,6 +19,7 @@ export async function generateNow(_prev: BriefActionState): Promise<BriefActionS
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function sendNow(_prev: BriefActionState): Promise<BriefActionState> {
   await requireAdmin();
   try {

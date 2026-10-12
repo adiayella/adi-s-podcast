@@ -2,7 +2,7 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { normalize } from "@/nlp/verify";
 
-const { podcasts, episodes, episodeSources } = schema;
+const { episodes, episodeSources } = schema;
 const API = "https://www.googleapis.com/youtube/v3";
 const MIN_EPISODE_SECONDS = 15 * 60; // shorter videos are clips/shorts, not full episodes
 const STOPWORDS = new Set(["the", "a", "an", "of", "and", "to", "in", "on", "for", "with", "is", "are", "how", "why", "what", "ft", "feat", "ep", "episode", "trs"]);
@@ -102,7 +102,7 @@ export type YoutubeSyncResult = {
 type EpisodeRow = { id: number; title: string; publishedAt: Date };
 
 /** Attach YouTube data to episodes we already have from RSS. Never creates episodes. */
-export async function syncYoutube(podcast: typeof podcasts.$inferSelect, sinceDays: number): Promise<YoutubeSyncResult> {
+export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, sinceDays: number): Promise<YoutubeSyncResult> {
   const result: YoutubeSyncResult = { podcastId: podcast.id, name: podcast.name, longVideos: 0, matched: 0, paidFlagged: 0, unmatched: [] };
   try {
     if (!podcast.youtubeChannelId) throw new Error("No YouTube channel configured");

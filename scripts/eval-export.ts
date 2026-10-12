@@ -15,7 +15,7 @@ async function main() {
       from episodes e join podcasts p on p.id = e.podcast_id and p.enabled
     ) t where rn <= 4 order by podcast, rn`;
   mkdirSync("data/eval", { recursive: true });
-  writeFileSync("data/eval/candidates.json", JSON.stringify(rows.map(({ rn: _rn, ...r }) => r), null, 1));
+  writeFileSync("data/eval/candidates.json", JSON.stringify(rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "rn"))), null, 1));
   for (const r of rows) {
     const d = String(r.description ?? "");
     const lines = d.split("\n").map((l) => l.trim()).filter(Boolean);
