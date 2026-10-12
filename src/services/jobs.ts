@@ -8,6 +8,7 @@ import { checkDelivery, checkPendingDeliveries, generateBrief, sendBrief } from 
 import { checkReadiness } from "@/services/readiness";
 import { buildAudienceThemes, runAudienceAnalysis } from "@/services/audience";
 import { scoreOpportunities } from "@/services/intelligence";
+import { ensureDrafts } from "@/services/outreach";
 import { buildClusters, embedMissingEpisodes } from "@/services/semantic";
 import { discoverCore } from "@/services/discovery";
 import { ingestAllEnabled } from "@/services/ingest";
@@ -141,6 +142,14 @@ export function runWeekly(opts: { force?: boolean; now?: Date; deliveryWaitMs?: 
       ready = await checkReadiness(opts.now);
     }
     d.readiness = ready;
+
+    // Fresh scores and draft emails for the top targets, so the brief can say who to contact and what to send. Drafts only.
+    try {
+      d.opportunities = await scoreOpportunities(opts.now);
+      d.drafts = await ensureDrafts();
+    } catch (e) {
+      d.draftError = e instanceof Error ? e.message.slice(0, 160) : String(e);
+    }
 
     // 2. Generate (reuses an existing ready brief for the week).
     const gen = await generateBrief({ force: opts.force, weekStart, now: opts.now, dataNotes: ready.ready ? [] : ready.notes });

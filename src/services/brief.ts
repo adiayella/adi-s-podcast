@@ -123,7 +123,9 @@ export async function sendBrief(opts: { reportId?: number; force?: boolean; week
         html: toHtml(doc, base ? `${base}/brief` : undefined),
         text: toText(doc),
       },
-      { idempotencyKey: `brief-${report.weekStart}-${to}-a${claimed.attempts}${opts.force ? "-force" : ""}` },
+      // The key changes whenever the brief is regenerated (its body changes) or the attempt number moves on, and stays the
+      // same for a crash-and-retry of the identical message, which is the only case where the provider must dedupe.
+      { idempotencyKey: `brief-${report.weekStart}-${to}-g${report.generatedAt?.getTime() ?? 0}-a${claimed.attempts}${opts.force ? "-force" : ""}` },
     );
     if (error || !data) return markFailed(report.id, error?.message ?? "Resend returned no id");
     await db

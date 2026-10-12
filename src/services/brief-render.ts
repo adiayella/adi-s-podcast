@@ -154,6 +154,49 @@ export function buildBriefDoc(stats: BriefStats, narrative: Narrative | null): B
     }
   }
 
+  // ---------------------------------------------------------------- A. sector intelligence
+  const sectorBlocks: Block[] = (stats.sectors ?? []).map((x) => ({
+    kind: "item" as const,
+    title: `${x.name}${x.focus ? " (your focus)" : ""}`,
+    meta: `${x.episodesThisWeek} episodes vs ${x.episodesPrevWeek} the week before (${x.trend}) · engagement ${x.perfIndex === null ? "not enough data" : `${x.perfIndex}x the shows' norm`}${x.per1k !== null ? ` · ${x.per1k} likes+comments per 1,000 views` : ""} · views gained ${x.viewsGained7d === null ? "needs more history" : x.viewsGained7d.toLocaleString("en-IN")} · evidence ${x.confidence}`,
+  }));
+  const audienceBlocks: Block[] = (stats.audience ?? []).map((a) => ({
+    kind: "item" as const,
+    title: a.label,
+    meta: `Observed: ${plural(a.support, "comment")} across ${plural(a.videos, "video")} (${a.kind.replace("_", " ")})`,
+    body: [...(a.quote ? [`“${a.quote}”`] : []), ...(a.interviewQuestion ? [`AI-suggested interview question: ${a.interviewQuestion}`] : [])],
+  }));
+
+  // ---------------------------------------------------------------- D. who to contact and what to send
+  const outreachBlocks: Block[] = [];
+  if (stats.outreach?.length) {
+    outreachBlocks.push({ kind: "p", muted: true, text: "These are DRAFTS for you to review. Nothing has been sent to anyone, and nothing will be sent without you. Open the Outreach page to edit, copy and approve." });
+    for (const o of stats.outreach) {
+      const contact = o.contacts.length ? `Contact routes you saved: ${o.contacts.map((c) => `${c.kind}: ${c.value}${c.verified ? "" : " (unverified)"}`).join("; ")}` : "No contact route saved yet. Add one you found yourself on the Outreach page.";
+      outreachBlocks.push({
+        kind: "item",
+        title: `${o.name}${o.company && o.kind === "guest" ? ` (${o.company})` : ""} · ${o.kind === "guest" ? "guest" : "sponsor with verified disclosure"}`,
+        meta: `Opportunity score ${o.score.toFixed(0)}${o.status ? ` · draft status: ${o.status}` : " · no draft written yet"}`,
+        body: [
+          ...(o.why.length ? [`Why: ${o.why.join("; ")}`] : []),
+          ...o.evidence.map((e) => `Source: ${e.title} (${e.podcast}, ${e.date})`),
+          contact,
+          ...(o.subject && o.body ? [`Suggested subject: ${o.subject}`, "Draft email (not sent):", ...o.body.split(/\n+/)] : ["No draft yet. Use “Write a draft” on the Outreach page."]),
+        ],
+        links: o.evidence.filter((e) => e.url).map((e) => ({ label: e.title, url: e.url! })),
+      });
+    }
+  } else outreachBlocks.push({ kind: "p", muted: true, text: "No one met the bar for outreach this week." });
+
+  // ---------------------------------------------------------------- E. weekly action plan (chosen by rule from the data above)
+  const planBlocks: Block[] = [];
+  if (stats.plan) {
+    const pl = stats.plan;
+    planBlocks.push({ kind: "p", text: pl.guest ? `1. Contact ${pl.guest.name} first. ${pl.guest.reason}.` : "1. No guest stands out this week; keep monitoring." });
+    planBlocks.push({ kind: "p", text: pl.topic ? `2. Prioritise the topic “${pl.topic.name}”: ${pl.topic.reason}.` : "2. No topic is clearly gaining ground this week." });
+    planBlocks.push({ kind: "p", text: pl.sponsor ? `3. Pitch ${pl.sponsor.name}: ${pl.sponsor.reason}.` : `3. ${pl.sponsorNote}` });
+  }
+
   const actions: Block[] = narrative?.actions.length
     ? narrative.actions.map((a) => ({ kind: "p" as const, text: a }))
     : [{ kind: "p", muted: true, text: "No AI-written actions this week. Use the ranked lists above: contact the top guests, plan around the top topics, and verify the sponsor leads before pitching." }];
@@ -163,11 +206,14 @@ export function buildBriefDoc(stats: BriefStats, narrative: Narrative | null): B
     title: stats.period ? `Monday Intelligence Brief · ${periodShort(stats.period.from)}` : `Monday Intelligence Brief · week of ${week}`,
     sections: [
       ...(intro.length ? [{ heading: "This week", blocks: intro }] : []),
+      ...(planBlocks.length ? [{ heading: "Your action plan for the week", blocks: planBlocks }] : []),
+      ...(sectorBlocks.length ? [{ heading: "Sector intelligence", blocks: [...sectorBlocks, ...(audienceBlocks.length ? [{ kind: "p" as const, muted: true, text: "What the audience is asking (sample of public YouTube comments):" }, ...audienceBlocks] : [])] }] : []),
       { group: focusGroup, groupNote: focusNote, heading: "Guest opportunities", blocks: guestBlocks },
       { heading: "Trending topics", blocks: topicBlocks },
       ...(unexpectedBlocks.length ? [{ heading: "Unexpected trends in your monitored shows", blocks: unexpectedBlocks }] : []),
       { heading: "Sponsor opportunities", blocks: sponsorBlocks },
       ...discoverySections,
+      ...(stats.outreach ? [{ heading: "Who to contact and what to send", blocks: outreachBlocks }] : []),
       { group: stats.discovery || stats.focus ? "Next steps" : undefined, heading: "Recommended actions", blocks: actions },
     ],
   };

@@ -5,6 +5,9 @@ import { getCoverage } from "@/lib/queries";
 import { getFocusContext } from "@/services/focus-context";
 import { lastRealRun } from "@/services/job-log";
 import { addDays, weekLabel, weekRange } from "@/lib/weeks";
+import { getSectorTrends } from "@/services/intelligence";
+import { topAudienceThemes } from "@/services/audience";
+import { listTargets } from "@/services/outreach";
 import { getGuestRadar, getSponsorRadar, getTopicRadar, parsePeriod } from "@/services/radars";
 
 // Everything in the brief that is a fact comes from here: SQL counts and the same scoring code the
@@ -23,6 +26,22 @@ export type DiscoveryStats = {
   founders: { name: string; role: string | null; company: string | null; shows: string[] }[];
   sponsors: { brand: string; classification: string; shows: string[]; quote: string; example: { title: string; url: string | null; candidate: string } }[];
 };
+
+export type SectorBrief = { name: string; episodesThisWeek: number; episodesPrevWeek: number; trend: string; perfIndex: number | null; per1k: number | null; viewsGained7d: number | null; confidence: string; focus: boolean };
+export type AudienceBrief = { kind: string; label: string; support: number; videos: number; quote: string | null; interviewQuestion: string | null };
+export type OutreachBrief = {
+  kind: "guest" | "brand";
+  name: string;
+  company: string | null;
+  score: number;
+  why: string[];
+  evidence: { title: string; podcast: string; date: string; url: string | null }[];
+  contacts: { kind: string; value: string; verified: boolean }[];
+  subject: string | null;
+  body: string | null;
+  status: string | null; // draft | approved | null when no draft exists
+};
+export type ActionPlan = { guest: { name: string; reason: string } | null; topic: { name: string; reason: string } | null; sponsor: { name: string; reason: string } | null; sponsorNote: string | null };
 
 export type FocusSummary = {
   settingsVersion: number;
@@ -44,6 +63,10 @@ export type BriefStats = {
   weekStart: string;
   // the reported Monday-to-Sunday IST week and the one before it, with real counts for both
   period?: { label: string; from: string; to: string; previousLabel: string };
+  sectors?: SectorBrief[];
+  audience?: AudienceBrief[];
+  outreach?: OutreachBrief[];
+  plan?: ActionPlan;
   dataNotes?: string[]; // set when the brief had to be written from data that was not fully fresh or analysed
   activity?: { episodes: number; previousEpisodes: number; shows: number; previousShows: number; newGuests: number; previousNewGuests: number };
   generatedAt: string;
@@ -226,6 +249,34 @@ export async function buildBriefStats(weekStart: string, generatedAt = new Date(
     };
   }
 
+  // Sector intelligence: topic momentum and engagement, measured as of the end of the reported week.
+  const sectorRows = (await getSectorTrends({ asOf: now })).filter((x) => x.episodesThisWeek + x.episodesPrevWeek > 0);
+  const sectors: SectorBrief[] = sectorRows
+    .sort((a, b) => Number(b.focus) - Number(a.focus) || b.episodesThisWeek - b.episodesPrevWeek - (a.episodesThisWeek - a.episodesPrevWeek) || b.episodesThisWeek - a.episodesThisWeek)
+    .slice(0, 5)
+    .map((x) => ({ name: x.name, episodesThisWeek: x.episodesThisWeek, episodesPrevWeek: x.episodesPrevWeek, trend: x.trend, perfIndex: x.perfIndex, per1k: x.per1k, viewsGained7d: x.viewsGained7d, confidence: x.confidence.level, focus: x.focus }));
+
+  const audience: AudienceBrief[] = (await topAudienceThemes(4)).map((t) => ({ kind: t.kind, label: t.label, support: t.support, videos: t.videos, quote: (t.quotes as string[])[0] ?? null, interviewQuestion: (t.interviewQuestions as string[])[0] ?? null }));
+
+  // Who to contact: the top scored guests plus verified-disclosure sponsors, with the founder's own saved contact routes and the live draft.
+  const targets = await listTargets({ guests: 3, sponsors: 1 });
+  const outreach: OutreachBrief[] = [];
+  for (const tg of targets) {
+    const ev = tg.draft ? ((tg.draft.evidence as { episodes?: { title: string; podcast: string; date: string; url: string | null }[] }).episodes ?? []) : [];
+    outreach.push({ kind: tg.kind, name: tg.name, company: tg.company, score: tg.score, why: tg.reasons, evidence: ev.slice(0, 2), contacts: tg.contacts.map((c) => ({ kind: c.kind, value: c.value, verified: c.verified })), subject: tg.draft?.subject ?? null, body: tg.draft?.body ?? null, status: tg.draft?.status ?? null });
+  }
+
+  // The action plan is chosen by rule from the data above, not written by the AI.
+  const topGuest = outreach.find((o) => o.kind === "guest");
+  const topSector = sectors.find((x) => x.trend === "rising" || x.trend === "new") ?? sectors[0];
+  const topSponsor = sponsors.find((x) => x.disclosedEpisodes > 0);
+  const plan: ActionPlan = {
+    guest: topGuest ? { name: topGuest.name, reason: topGuest.why[0] ?? "highest opportunity score this week" } : null,
+    topic: topSector ? { name: topSector.name, reason: `${topSector.episodesThisWeek} episodes this week vs ${topSector.episodesPrevWeek} the week before${topSector.perfIndex !== null ? `, performing at ${topSector.perfIndex}x its shows' norm` : ""}` } : null,
+    sponsor: topSponsor ? { name: topSponsor.name, reason: `disclosed on ${topSponsor.disclosedEpisodes} episode(s) across ${topSponsor.disclosedShows} show(s)` } : null,
+    sponsorNote: topSponsor ? null : "No brand was disclosed as a sponsor this period, so there is no verified sponsor to pitch. Promo-link brands are listed above as unverified leads only.",
+  };
+
   const multi = guestRows.filter((g) => g.distinctPodcasts >= 2).length;
   return {
     weekStart,
@@ -245,6 +296,10 @@ export async function buildBriefStats(weekStart: string, generatedAt = new Date(
     },
     unexpected,
     discovery,
+    sectors,
+    audience,
+    outreach,
+    plan,
     guests,
     guestEvidence: { windowDays: guestWindowDays, guestsInWindow: guestRows.length, onMultipleShows: multi, sufficient: multi >= 1 },
     topics,

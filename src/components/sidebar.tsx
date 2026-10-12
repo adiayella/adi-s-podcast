@@ -9,6 +9,7 @@ import {
   Layers,
   MessageCircleQuestion,
   Scale,
+  Send,
   Lock,
   LayoutDashboard,
   Megaphone,
@@ -30,6 +31,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 
 const MANAGE: typeof NAV = [
   { href: "/research", label: "Research Center", icon: Compass },
+  { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/rubrics", label: "Scoring Rubrics", icon: Scale },
   { href: "/settings", label: "Data Sources", icon: Settings },
   { href: "/admin", label: "Admin", icon: Lock },

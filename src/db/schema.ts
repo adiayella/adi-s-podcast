@@ -500,3 +500,34 @@ export const opportunityScores = pgTable(
   },
   (t) => [uniqueIndex("opportunity_scores_uq").on(t.kind, t.entityId, t.weekStart)],
 );
+
+// ---------- Phase 5: outreach (copy only; nothing here is ever sent automatically) ----------
+// Contact routes are typed in by the founder. The system never guesses, derives or looks up an address.
+export const contactRoutes = pgTable("contact_routes", {
+  id: serial("id").primaryKey(),
+  entityKind: text("entity_kind").notNull(), // guest | brand
+  entityId: integer("entity_id").notNull(),
+  kind: text("kind").notNull(), // email | linkedin | website | x | other
+  value: text("value").notNull(),
+  sourceUrl: text("source_url"), // where the founder found it (public profile, company contact page...)
+  verified: boolean("verified").notNull().default(false), // the founder's own statement that they confirmed it
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const outreachDrafts = pgTable("outreach_drafts", {
+  id: serial("id").primaryKey(),
+  entityKind: text("entity_kind").notNull(), // guest | brand
+  entityId: integer("entity_id").notNull(),
+  status: text("status").notNull().default("draft"), // draft | approved | rejected | superseded
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  evidence: jsonb("evidence").notNull(), // the facts the draft was allowed to use: episodes, quotes
+  warnings: jsonb("warnings").notNull().default([]), // problems found by the safety check
+  edited: boolean("edited").notNull().default(false), // changed by the founder after generation
+  model: text("model").notNull(),
+  promptVersion: text("prompt_version").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

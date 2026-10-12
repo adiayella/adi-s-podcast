@@ -74,6 +74,16 @@ async function main() {
   t("Comparison: the brief states the reporting period and the previous one", row.briefMarkdown.includes("Reporting period:") && row.briefMarkdown.includes(addDays(real, -7)));
   t("Hand-off: accepted by the provider, with a provider message id and recipient recorded", row.sendStatus === "accepted" && Boolean(row.providerEmailId) && Boolean(row.recipient), `to ${row.recipient}, id ${row.providerEmailId?.slice(0, 8)}…`);
 
+  // content required by the brief: sector intelligence, who to contact with drafts, and an action plan
+  const md = row.briefMarkdown;
+  t("Content A: sector intelligence with week-over-week change and engagement signals", md.includes("## Sector intelligence") && /episodes vs \d+ the week before/.test(md) && /likes\+comments per 1,000 views|engagement/.test(md));
+  t("Content B: guest opportunities list at most five guests, each with a tip or topics", (md.match(/^### /gm) ?? []).length > 3 && md.includes("## Guest opportunities"));
+  t("Content C: sponsor section separates disclosed sponsors from unverified promo links", md.includes("## Sponsor opportunities") && /(disclosed|unverified)/i.test(md));
+  t("Content D: who-to-contact has subject lines and draft text, labelled as not sent", md.includes("## Who to contact and what to send") && md.includes("Suggested subject:") && md.includes("Draft email (not sent):"));
+  t("Content E: the action plan names a guest, a topic and a sponsor (or says none is verified)", md.includes("## Your action plan for the week") && /^1\. /m.test(md) && /^2\. /m.test(md) && /^3\. /m.test(md));
+  const sentDrafts = await count(sql`select count(*)::int n from outreach_drafts where status not in ('draft','approved','rejected','superseded')`);
+  t("Safety: generating the brief contacted no one outside the founder (drafts only, no 'sent' state exists)", sentDrafts === 0 && row.recipient === (process.env.BRIEF_TO_EMAIL ?? row.recipient));
+
   // delivery is whatever the provider says; poll until it is final (up to 90 s)
   let status: DeliveryStatus = "unknown";
   let event = "";
