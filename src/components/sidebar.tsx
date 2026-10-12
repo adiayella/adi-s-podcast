@@ -62,7 +62,7 @@ export function Sidebar() {
           <Radio size={18} />
         </span>
         <span className="text-lg font-semibold tracking-tight">
-          Podcast <span className="font-light">Radar</span>
+          Adi&apos;s Podcast <span className="font-light">Radar</span>
         </span>
       </Link>
 
