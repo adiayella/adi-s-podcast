@@ -68,6 +68,17 @@ export async function searchShows(q: string, limit = 10): Promise<SpotifyShow[]>
   return r.shows.items.filter((s): s is RawShow => !!s).map(toShow);
 }
 
+export type SpotifyEpisodeHit = { id: string; title: string; date: string | null; imageUrl: string | null; url: string; durationMinutes: number };
+
+/** Episodes Spotify returns for a free-text query in the Indian market, in Spotify's order. Shown to the user only. */
+export async function searchEpisodes(q: string, limit = 8): Promise<SpotifyEpisodeHit[]> {
+  type Raw = RawEpisode & { images: Image[] };
+  const r = await sp<{ episodes: { items: (Raw | null)[] } }>("search", { q, type: "episode", limit: String(Math.min(limit, 10)) });
+  return r.episodes.items
+    .filter((e): e is Raw => !!e)
+    .map((e) => ({ id: e.id, title: e.name, date: e.release_date ?? null, imageUrl: pickImage(e.images ?? []), url: e.external_urls.spotify, durationMinutes: Math.round((e.duration_ms ?? 0) / 60000) }));
+}
+
 /** Newest episodes of a show, newest first. 50 per call; stops paging once episodes are older than `since`. */
 export async function showEpisodes(showId: string, max = 50, since?: Date): Promise<SpotifyEpisode[]> {
   const out: SpotifyEpisode[] = [];
