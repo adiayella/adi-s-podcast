@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { DEFAULT_WEIGHTS, type RadarKind } from "@/lib/scoring-config";
+import { topicTrend, type TopicTrend, type TopicTrendLabel } from "@/scoring/trend";
 import { brandMatchesFocus, guestMatchesFocus, isUnexpectedTopic, matchedInterests } from "@/research/focus";
 import { getFocusContext, notExcluded, type FocusContext } from "@/services/focus-context";
 import {
@@ -178,8 +179,9 @@ export type TopicRow = {
   episodes: EpisodeRef[];
   score: ScoreResult;
   rank: number;
-  momentumPct: number | null;
-  trend: "rising" | "steady" | "falling" | "new";
+  momentumPct: number | null; // vs the topic's 4-week normal (see topic-trend rubric)
+  trend: TopicTrendLabel;
+  trendDetail: TopicTrend;
   focus: boolean; // a topic the founder asked for, or recent episodes that match their interests
   unexpected: boolean; // not asked for and not excluded: a candidate for "unexpected trend"
 };
@@ -193,6 +195,11 @@ export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusCon
       count(distinct e.id) filter (where e.published_at >= ${at} - interval '30 days')::int as "episodes30d",
       count(distinct e.id) filter (where e.published_at >= ${at} - interval '7 days')::int as "episodesThisWeek",
       count(distinct e.id) filter (where e.published_at >= ${at} - interval '14 days' and e.published_at < ${at} - interval '7 days')::int as "episodesPrevWeek",
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '21 days' and e.published_at < ${at} - interval '14 days')::int as "w2",
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '28 days' and e.published_at < ${at} - interval '21 days')::int as "w3",
+      count(distinct e.id) filter (where e.published_at >= ${at} - interval '35 days' and e.published_at < ${at} - interval '28 days')::int as "w4",
+      count(distinct e.podcast_id) filter (where e.published_at >= ${at} - interval '7 days')::int as "showsThisWeek",
+      (avg(et.confidence) filter (where e.published_at >= ${at} - interval '35 days'))::float as "trendConfidence",
       count(distinct e.id) filter (where date_trunc('month', e.published_at at time zone 'Asia/Kolkata') = date_trunc('month', ${at} at time zone 'Asia/Kolkata'))::int as "episodesThisMonth",
       count(distinct e.podcast_id) filter (where e.published_at >= ${at} - interval '30 days')::int as "distinctPodcasts",
       array_agg(distinct p.name) filter (where e.published_at >= ${at} - interval '30 days') as podcasts,
@@ -227,6 +234,7 @@ export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusCon
     .map((r) => {
       const thisWeek = Number(r.episodesThisWeek);
       const prev = Number(r.episodesPrevWeek);
+      const trend = topicTrend({ weeks: [thisWeek, prev, Number(r.w2), Number(r.w3), Number(r.w4)], showsThisWeek: Number(r.showsThisWeek), confidence: (r.trendConfidence as number) ?? null });
       const score = topicScore(
         { distinctPodcasts: Number(r.distinctPodcasts), episodesThisWeek: thisWeek, episodesPrevWeek: prev, daysSinceLast: daysBetween(now, r.lastAt as string), confidence: (r.confidence as number) ?? null },
         weights,
@@ -246,8 +254,9 @@ export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusCon
         episodes: eps.filter((e) => Number(e.topicId) === Number(r.id)),
         score,
         rank: 0,
-        momentumPct: prev === 0 ? null : ((thisWeek - prev) / prev) * 100,
-        trend: prev === 0 && thisWeek > 0 ? "new" : thisWeek > prev ? "rising" : thisWeek < prev ? "falling" : "steady",
+        momentumPct: trend.momentumPct,
+        trend: trend.label,
+        trendDetail: trend,
         focus:
           (fx.config.categories as string[]).includes(r.name as string) ||
           (fx.config.priorityTopics as string[]).includes(r.name as string) ||

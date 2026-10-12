@@ -6,6 +6,7 @@ import { EpisodeLinks, Pct, ScoreCell, Sparkline } from "@/components/radar-ui";
 import { FilterForm } from "@/components/filter-form";
 import { getEnabledPodcasts, getTopicRadar } from "@/services/radars";
 import { formatDateIST } from "@/lib/format";
+import type { TopicTrend } from "@/scoring/trend";
 
 export default function TopicRadarPage({ searchParams }: PageProps<"/topics">) {
   return (
@@ -18,18 +19,42 @@ export default function TopicRadarPage({ searchParams }: PageProps<"/topics">) {
   );
 }
 
-function Trend({ t }: { t: { trend: string; momentumPct: number | null; episodesThisWeek: number; episodesPrevWeek: number } }) {
-  if (t.trend === "new") return <Badge tone="good">New this week</Badge>;
+function Trend({ t }: { t: { trend: string; momentumPct: number | null; episodesThisWeek: number; trendDetail: TopicTrend } }) {
+  const d = t.trendDetail;
+  const why = (
+    <details className="mt-1 text-xs">
+      <summary className="cursor-pointer text-muted hover:text-ink">why</summary>
+      <p className="mt-1 max-w-[260px] text-muted">{d.summary}</p>
+      <ul className="mt-1 grid gap-0.5">
+        {d.gates.map((g) => (
+          <li key={g.key} className={g.met ? "text-good" : "text-muted"}>
+            {g.met ? "✓" : "✗"} {g.label}: {g.detail}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+  if (t.trend === "new")
+    return (
+      <div>
+        <Badge tone="good">New this week</Badge>
+        {why}
+      </div>
+    );
   const Icon = t.trend === "rising" ? ArrowUpRight : t.trend === "falling" ? ArrowDownRight : ArrowRight;
   const tone = t.trend === "rising" ? "text-good" : t.trend === "falling" ? "text-bad" : "text-muted";
   return (
-    <span className={`inline-flex items-center gap-1 ${tone}`}>
-      <Icon size={16} />
-      {t.momentumPct === null ? "—" : `${t.momentumPct > 0 ? "+" : ""}${Math.round(t.momentumPct)}%`}
-      <span className="text-xs text-muted">
-        ({t.episodesThisWeek} vs {t.episodesPrevWeek})
+    <div>
+      <span className={`inline-flex items-center gap-1 ${tone}`}>
+        <Icon size={16} />
+        <span className="capitalize">{t.trend}</span>
+        <span className="text-xs text-muted">
+          {t.momentumPct === null ? "" : `${t.momentumPct > 0 ? "+" : ""}${Math.round(t.momentumPct)}% · `}
+          {t.episodesThisWeek} vs normal {d.baseline}
+        </span>
       </span>
-    </span>
+      {why}
+    </div>
   );
 }
 
@@ -49,7 +74,7 @@ async function Radar({ searchParams }: { searchParams: PageProps<"/topics">["sea
       <div className="grid gap-5 md:grid-cols-3">
         <KpiCard label="Topics active (30d)" value={topics.length} icon={Hash} hint="From a fixed list of 20 topics" />
         <KpiCard label="Covered by 3+ shows" value={multi.length} icon={Flame} hint={multi.slice(0, 2).map((t) => t.name).join(", ") || undefined} />
-        <KpiCard label="Rising this week" value={rising.length} icon={TrendingUp} hint="This week vs the 7 days before" />
+        <KpiCard label="Rising this week" value={rising.length} icon={TrendingUp} hint="Rising or new under the topic-trend rubric (vs each topic's 4-week normal)" />
       </div>
 
       {topics.length === 0 ? (

@@ -105,6 +105,21 @@ export function engagementOf(episodes: CandidateEpisode[]): Engagement | null {
   return { videos: withViews.length, medianViews: median(views), recentMedianViews: median(views.slice(0, half)), earlierMedianViews: median(views.slice(half)) };
 }
 
+/** The discovery "trending" rule in words, kept next to evaluateTrend so the two cannot drift apart. */
+export const DISCOVERY_TREND_RUBRIC = {
+  version: "discovery-trend-v1",
+  signals: [
+    { label: "Consistent publishing", rule: "Steady cadence, 6+ episodes in 90 days, spread over 8+ different weeks (a burst does not count)." },
+    { label: "Growth in relevant episodes", rule: "Episodes matching your focus: last 30 days at least 1.25x the 30 days before, with 2+ in each window." },
+    { label: "Engagement or history rising", rule: "YouTube median views of recent videos 1.2x+ earlier ones, or more relevant episodes than at our earlier checks." },
+  ],
+  labels: [
+    { label: "trending", rule: "Relevance 40+ AND growth in relevant episodes AND at least 2 of the 3 signals." },
+    { label: "active", rule: "Relevance 30+, an episode in the last 30 days and 3+ in 90 days." },
+    { label: "inactive", rule: "Anything else." },
+  ],
+} as const;
+
 export type TrendLabel = "trending" | "active" | "inactive";
 export type TrendResult = { label: TrendLabel; signals: { name: string; met: boolean; detail: string }[]; signalsMet: number };
 

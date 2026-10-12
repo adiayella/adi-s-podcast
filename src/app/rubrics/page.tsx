@@ -3,13 +3,14 @@ import { connection } from "next/server";
 import { Scale } from "lucide-react";
 import { Badge, EmptyState, PageHeader, Panel, PanelSkeleton } from "@/components/ui";
 import { RubricForm } from "@/components/rubric-form";
+import { TrendRubrics } from "@/components/trend-rubrics";
 import { isAdmin } from "@/lib/admin";
 import { getActiveRubric, latestOpportunities } from "@/services/intelligence";
 
 export default function RubricsPage() {
   return (
     <>
-      <PageHeader title="Scoring Rubrics" subtitle="How guests and sponsors are ranked as opportunities. Every score shows its reasons; changing the weights makes a new version and never rewrites history." />
+      <PageHeader title="Scoring Rubrics" subtitle="How guests and sponsors are ranked as opportunities, and the written rules behind every trending label. Every score shows its reasons; changing the weights makes a new version and never rewrites history." />
       <Suspense fallback={<PanelSkeleton className="h-96" />}>
         <Body />
       </Suspense>
@@ -85,6 +86,7 @@ async function Body() {
           </Panel>
         );
       })}
+      <TrendRubrics />
     </div>
   );
 }
