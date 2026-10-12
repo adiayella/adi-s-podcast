@@ -1,0 +1,1 @@
+ALTER TABLE "podcasts" ADD CONSTRAINT "podcasts_rss_url_unique" UNIQUE("rss_url");

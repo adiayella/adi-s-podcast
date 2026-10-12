@@ -1,0 +1,1261 @@
+{
+ "report": {
+  "promptVersion": "v3",
+  "episodes": 39,
+  "goldStatus": "draft",
+  "guests": {
+   "tp": 37,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1,
+   "recall": 1,
+   "f1": 1
+  },
+  "topics": {
+   "tp": 65,
+   "fp": 16,
+   "fn": 14,
+   "precision": 0.8024691358024691,
+   "recall": 0.8227848101265823,
+   "f1": 0.8125000000000001
+  },
+  "sponsors": {
+   "tp": 3,
+   "fp": 0,
+   "fn": 1,
+   "precision": 1,
+   "recall": 0.75,
+   "f1": 0.8571428571428571
+  },
+  "sponsorClassificationAccuracy": 0.6666666666666666,
+  "falseConfirmedSponsors": 0,
+  "episodeTypeAccuracy": 0.9743589743589743
+ },
+ "errors": [
+  "#6 SPONSOR missed: Mobius",
+  "#33 SPONSOR class: ASUS predicted unknown, gold possible_affiliate",
+  "#27 TOPIC missed: Economy & Policy",
+  "#96 TOPIC extra: Venture Capital",
+  "#96 TOPIC missed: Technology",
+  "#101 TOPIC extra: Venture Capital",
+  "#105 TOPIC extra: Startup Funding",
+  "#119 TOPIC extra: Marketing & Growth",
+  "#123 TOPIC extra: SaaS & B2B",
+  "#123 TOPIC missed: Technology",
+  "#122 TOPIC extra: Entrepreneurship",
+  "#122 TOPIC missed: Leadership",
+  "#74 TOPIC extra: Artificial Intelligence",
+  "#168 TOPIC extra: Stock Markets & Investing",
+  "#138 TOPIC missed: Geopolitics & Energy",
+  "#180 TOPIC missed: Geopolitics & Energy",
+  "#134 TOPIC extra: Stock Markets & Investing",
+  "#115 TOPIC extra: Stock Markets & Investing",
+  "#115 TOPIC missed: Startup Funding",
+  "#118 TOPIC extra: Leadership",
+  "#114 TOPIC extra: Technology",
+  "#88 TOPIC missed: Leadership",
+  "#78 TOPIC missed: Startup Funding",
+  "#85 TOPIC extra: SaaS & B2B",
+  "#85 TOPIC missed: Health & Wellness",
+  "#60 TYPE: predicted panel, gold interview (Human Brain Explained By Neurosurgeon, Neurologist)",
+  "#69 TOPIC extra: Entrepreneurship",
+  "#69 TOPIC missed: Geopolitics & Energy",
+  "#70 TOPIC extra: Entrepreneurship",
+  "#70 TOPIC missed: Geopolitics & Energy",
+  "#67 TOPIC extra: Economy & Policy",
+  "#67 TOPIC missed: Artificial Intelligence",
+  "#67 TOPIC missed: Leadership"
+ ],
+ "perEpisode": [
+  {
+   "id": 6,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Sumant Sinha",
+      "role": "Founder, Chairman & CEO",
+      "company": "ReNew",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Sumant Sinha — Founder, Chairman & CEO of ReNew"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Geopolitics & Energy",
+      "confidence": 1
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 36,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Satinder Sartaaj",
+      "role": "Singer, Lyricist, Composer & Actor",
+      "company": "",
+      "category": "creator",
+      "confidence": 1,
+      "evidence": "we sit down with Satinder Sartaaj, Singer, Lyricist, Composer & Actor"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Creator Economy & Media",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": [
+     {
+      "brand": "Urban Platter",
+      "category": "food & beverage",
+      "classification": "explicit_sponsor",
+      "selfPromotion": false,
+      "evidence": "This episode is brought to you by Urban Platter. To know more, checkout: ⁠⁠https://bit.ly/urban-platter-figuring-out⁠⁠",
+      "confidence": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": 33,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Dr. K",
+      "role": "Psychiatrist & President",
+      "company": "Healthy Gamer",
+      "category": "expert",
+      "confidence": 1,
+      "evidence": "we sit down with Dr. K - MD, MPH, Psychiatrist & President of Healthy Gamer"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Health & Wellness",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": [
+     {
+      "brand": "ASUS",
+      "category": "laptops",
+      "classification": "unknown",
+      "selfPromotion": false,
+      "evidence": "Checkout ASUS ExpertBook P Series: https://www.flipkart.com/asus-expertbook-core-ultra-store",
+      "confidence": 0.85
+     }
+    ]
+   }
+  },
+  {
+   "id": 27,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Jiang Xueqin",
+      "role": "Professor",
+      "company": "",
+      "category": "expert",
+      "confidence": 0.95,
+      "evidence": "Professor Jiang Xueqin on hidden power networks, empire collapse, and who really controls the world."
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Geopolitics & Energy",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": [
+     {
+      "brand": "ASUS Experbook",
+      "category": "Technology Hardware",
+      "classification": "possible_affiliate",
+      "selfPromotion": false,
+      "evidence": "Checkout the ASUS Experbook series:- https://www.flipkart.com/asus-expertbook-core-ultra-store",
+      "confidence": 0.8
+     }
+    ]
+   }
+  },
+  {
+   "id": 96,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Aridni Shah",
+      "role": "Co-founder",
+      "company": "Immunito AI",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Dr. Aridni Shah of Immunito AI sat down with host Akshay Datt"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Venture Capital",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 109,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Ajay Jain",
+      "role": "co-founder",
+      "company": "Silverneedle Ventures",
+      "category": "investor",
+      "confidence": 0.95,
+      "evidence": "Ajay Jain, co-founder of Silverneedle Ventures, refuses to look at it, and the bottom-up question he asks instead is the real test that decides who gets funded into his ₹800 Cr Silver X deep tech fund."
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Venture Capital",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 101,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Manav Bansal",
+      "role": "Founder",
+      "company": "Drivn",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Manav Bansal left a $2.5 billion investment mandate to build Drivn"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 1
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 1
+     },
+     {
+      "topic": "Venture Capital",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Fintech",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 105,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Salone Sehgal",
+      "role": "Co-Founder and Managing Partner",
+      "company": "Lumikai",
+      "category": "investor",
+      "confidence": 1,
+      "evidence": "Salone Sehgal, Co-Founder and Managing Partner at Lumikai"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Venture Capital",
+      "confidence": 1
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Creator Economy & Media",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 121,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Ankur Sachdeva",
+      "role": "Co-founder & CEO",
+      "company": "Uppal Brewers and Distillers",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Jerome Manuel sits down with Ankur Sachdeva, Co-founder & CEO of Uppal Brewers and Distillers"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "D2C & Consumer Brands",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 119,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Abhishek Ganguly",
+      "role": "Co-founder & CEO",
+      "company": "Agilitas",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Today, as Co-founder & CEO of Agilitas, he is pursuing a much bigger idea"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 1
+     },
+     {
+      "topic": "D2C & Consumer Brands",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Marketing & Growth",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 123,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Piyush Shah",
+      "role": "Co-founder",
+      "company": "InMobi and Glance",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Piyush Shah, Co-founder of InMobi and Glance"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.95
+     },
+     {
+      "topic": "SaaS & B2B",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 72,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Paras Chopra",
+      "role": "",
+      "company": "Wingify and Lossfunk",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Mukesh Bansal sits down with Paras Chopra, founder of Wingify and Lossfunk"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 122,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Subrata Mitra",
+      "role": "Co-founder and Partner",
+      "company": "Accel India",
+      "category": "investor",
+      "confidence": 1,
+      "evidence": "Subrata Mitra, Co-founder and Partner at Accel India and co-author of Down But Not Out"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Venture Capital",
+      "confidence": 1
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 1
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Leadership",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 74,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Professor Ajay Sood",
+      "role": "Principal Scientific Adviser to the Prime Minister of India",
+      "company": "Government of India",
+      "category": "expert",
+      "confidence": 1,
+      "evidence": "Mukesh Bansal is joined by Professor Ajay Sood, the Principal Scientific Adviser to the Prime Minister of India."
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Technology",
+      "confidence": 1
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 75,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Nick Bostrom",
+      "role": "Philosopher",
+      "company": "",
+      "category": "expert",
+      "confidence": 1,
+      "evidence": "Nick Bostrom is the philosopher who put superintelligence on the map."
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 73,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Sergey Levine",
+      "role": "co-founder",
+      "company": "Physical Intelligence",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Mukesh Bansal is joined by Sergey Levine, computer scientist and co-founder of Physical Intelligence"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 168,
+   "predicted": {
+    "episodeType": "news_briefing",
+    "guests": [],
+    "topics": [
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Stock Markets & Investing",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 138,
+   "predicted": {
+    "episodeType": "news_briefing",
+    "guests": [],
+    "topics": [
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Stock Markets & Investing",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 180,
+   "predicted": {
+    "episodeType": "news_briefing",
+    "guests": [],
+    "topics": [
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 134,
+   "predicted": {
+    "episodeType": "news_briefing",
+    "guests": [],
+    "topics": [
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Stock Markets & Investing",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 115,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Devansh Alijar",
+      "role": "",
+      "company": "",
+      "category": "founder",
+      "confidence": 0.9,
+      "evidence": "I’m joined by Devansh Alijar for a wide-ranging conversation about AI, investing and building modern businesses. Devansh has helped transform a traditional family jewellery business"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Stock Markets & Investing",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 118,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Dr. Tathagata Neogi",
+      "role": "CEO & Co-Founder",
+      "company": "Immersive Trails",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Dr. Tathagata Neogi CEO & Co-Founder, Immersive Trails"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 1
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Leadership",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 110,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Purvansh Parmar",
+      "role": "Co-founder",
+      "company": "Food Never Comes",
+      "category": "founder",
+      "confidence": 0.98,
+      "evidence": "Purvansh Parmar, Co-founder of Food Never Comes"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 236,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Sarbvir Singh",
+      "role": "Joint Group CEO",
+      "company": "PB Fintech",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "ET's Anirban Chowdhury speaks with Sarbvir Singh, Joint Group CEO of PB Fintech"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Fintech",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 114,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Aditya Pati",
+      "role": "Founder",
+      "company": "Build with Adi",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Aditya Pati (founder of \"Build with Adi\") joins the show"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 221,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Twesh Mishra",
+      "role": "",
+      "company": "ET",
+      "category": "journalist",
+      "confidence": 1,
+      "evidence": "Anirban Chowdhury speaks to ET's Twesh Mishra"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Geopolitics & Energy",
+      "confidence": 0.75
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 195,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Nishanth Vasudevan",
+      "role": "markets editor",
+      "company": "ET",
+      "category": "journalist",
+      "confidence": 0.95,
+      "evidence": "Anirban Chowdhury speaks with ET markets editor Nishanth Vasudevan"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Stock Markets & Investing",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 196,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Ashwini Vaishnaw",
+      "role": "Electronics and IT Minister",
+      "company": "",
+      "category": "other",
+      "confidence": 0.98,
+      "evidence": "Electronics and IT Minister Ashwini Vaishnaw speaks to ET's tech editor Surabhi Agarwal"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 77,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Nakul Mandan",
+      "role": "Founder / Investor",
+      "company": "Audacious Ventures",
+      "category": "investor",
+      "confidence": 0.95,
+      "evidence": "On this episode we have Nakul Mandan from Audacious Ventures."
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Venture Capital",
+      "confidence": 0.98
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 88,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Swapnil Jain",
+      "role": "Founder & CEO",
+      "company": "Observe AI",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "In this episode, Swapnil, Founder & CEO of Observe AI candidly shares what it takes to rebuild a company"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 1
+     },
+     {
+      "topic": "SaaS & B2B",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Startup Funding",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 78,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Tim Guleri",
+      "role": "Managing Director",
+      "company": "Sierra Ventures",
+      "category": "investor",
+      "confidence": 0.95,
+      "evidence": "Which SaaS Companies Will Survive Anthropic and OpenAI? | Tim Guleri, Sierra Ventures"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Venture Capital",
+      "confidence": 0.95
+     },
+     {
+      "topic": "SaaS & B2B",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.9
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 85,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Tanay Tandon",
+      "role": "Co-Founder & CEO",
+      "company": "Commure",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Tanay Tandon, Co-Founder & CEO, Commure"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 1
+     },
+     {
+      "topic": "SaaS & B2B",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Technology",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 63,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Abhijit Iyer-Mitra",
+      "role": "mythology researcher and content creator",
+      "company": "",
+      "category": "expert",
+      "confidence": 0.95,
+      "evidence": "we are joined by Abhijit Iyer-Mitra, a mythology researcher and content creator"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Creator Economy & Media",
+      "confidence": 0.5
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 59,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Brett Lee",
+      "role": "",
+      "company": "",
+      "category": "other",
+      "confidence": 1,
+      "evidence": "we are joined by Brett Lee, one of the fastest bowlers the game of cricket has ever seen"
+     }
+    ],
+    "topics": [],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 43,
+   "predicted": {
+    "episodeType": "panel",
+    "guests": [],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Careers & Hiring",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Creator Economy & Media",
+      "confidence": 0.9
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 60,
+   "predicted": {
+    "episodeType": "panel",
+    "guests": [
+     {
+      "name": "Havovi Hyderabadwalla",
+      "role": "Psychologist",
+      "company": "",
+      "category": "expert",
+      "confidence": 0.95,
+      "evidence": "Havovi Hyderabadwalla, one of India's top psychologists"
+     },
+     {
+      "name": "Dr. Sid Warrier",
+      "role": "Neurologist",
+      "company": "",
+      "category": "expert",
+      "confidence": 0.95,
+      "evidence": "Dr. Sid Warrier, one of India's top neurologists"
+     },
+     {
+      "name": "Dr. Alok Sharma",
+      "role": "Neurosurgeon",
+      "company": "",
+      "category": "expert",
+      "confidence": 0.95,
+      "evidence": "Dr. Alok Sharma, one of India's top neurosurgeons"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Health & Wellness",
+      "confidence": 0.95
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 69,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Henning Rath",
+      "role": "Chief Executive Officer",
+      "company": "EnerVenue",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "Henning Rath, Chief Executive Officer at EnerVenue"
+     },
+     {
+      "name": "Tang Kun",
+      "role": "Executive Chairman",
+      "company": "HiNa Battery",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "Kun Tang, Executive Chairman of HiNa Battery"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Technology",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.7
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 70,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Henning Rath",
+      "role": "Chief Executive Officer",
+      "company": "EnerVenue",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "Henning Rath, Chief Executive Officer at EnerVenue"
+     },
+     {
+      "name": "Kun Tang",
+      "role": "Executive Chairman",
+      "company": "HiNa Battery",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "Kun Tang, Executive Chairman of HiNa Battery"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Technology",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.85
+     }
+    ],
+    "sponsors": []
+   }
+  },
+  {
+   "id": 67,
+   "predicted": {
+    "episodeType": "interview",
+    "guests": [
+     {
+      "name": "Rajesh Magow",
+      "role": "Co-Founder & Group CEO",
+      "company": "MakeMyTrip Limited",
+      "category": "founder",
+      "confidence": 1,
+      "evidence": "Rajesh Magow, Co-Founder & Group CEO, MakeMyTrip Limited"
+     },
+     {
+      "name": "Puneet Chhatwal",
+      "role": "Managing Director & Chief Executive Officer",
+      "company": "The Indian Hotels Company Limited (IHCL)",
+      "category": "executive",
+      "confidence": 1,
+      "evidence": "Puneet Chhatwal, Managing Director & Chief Executive Officer, The Indian Hotels Company Limited (IHCL)"
+     }
+    ],
+    "topics": [
+     {
+      "topic": "Entrepreneurship",
+      "confidence": 0.95
+     },
+     {
+      "topic": "Artificial Intelligence",
+      "confidence": 0.8
+     },
+     {
+      "topic": "Economy & Policy",
+      "confidence": 0.85
+     },
+     {
+      "topic": "D2C & Consumer Brands",
+      "confidence": 0.8
+     }
+    ],
+    "sponsors": []
+   }
+  }
+ ]
+}

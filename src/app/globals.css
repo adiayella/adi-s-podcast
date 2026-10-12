@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg: #0a0f1f;
+  --shell: #101730;
+  --panel: #161f3a;
+  --panel-2: #1b2646;
+  --line: rgba(160, 174, 220, 0.12);
+  --text: #e9edf9;
+  --muted: #8f9bbd;
+  --accent: #5b6cf0;
+  --accent-2: #8b5cf6;
+  --accent-soft: #a5aef5;
+  --good: #7ee2a8;
+  --good-bg: rgba(126, 226, 168, 0.16);
+  --warn: #f6c667;
+  --bad: #ff8b8b;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-shell: var(--shell);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel-2);
+  --color-line: var(--line);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent-2);
+  --color-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(139, 92, 246, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(91, 108, 240, 0.28), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(91, 108, 240, 0.5);
+}
+
+/* Recharts tooltip text should stay legible on the dark theme */
+.recharts-default-tooltip {
+  background: var(--panel-2) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+}

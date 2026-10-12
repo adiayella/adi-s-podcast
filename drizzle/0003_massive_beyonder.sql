@@ -1,0 +1,1 @@
+ALTER TABLE "guests" ADD COLUMN "category" text;
