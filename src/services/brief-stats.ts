@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { candidateCounts, discoverySponsors, emergingThemes, foundersAcrossShows, listCandidates } from "@/services/discovery-queries";
+import { getCoverage } from "@/lib/queries";
 import { getFocusContext } from "@/services/focus-context";
 import { lastRealRun } from "@/services/job-log";
 import { getGuestRadar, getSponsorRadar, getTopicRadar, parsePeriod } from "@/services/radars";
@@ -34,6 +35,8 @@ export type FocusSummary = {
 };
 
 export type BriefStats = {
+  // how many monitored episodes were analysed from a transcript; the rest used title and description only
+  coverage?: { transcript: number; total: number; shows: number };
   focus?: FocusSummary;
   unexpected?: { name: string; shows: number; episodesThisWeek: number; episodesPrevWeek: number; trend: string; sampleEpisodes: Ep[] }[];
   discovery?: DiscoveryStats;
@@ -205,6 +208,7 @@ export async function buildBriefStats(weekStart: string, now = new Date()): Prom
   return {
     weekStart,
     generatedAt: now.toISOString(),
+    coverage: await getCoverage(),
     focus: {
       settingsVersion: fx.version,
       universe: `${(await rows<{ n: number }>(sql`select count(*)::int n from podcasts where enabled`))[0]?.n ?? 0} monitored podcasts`,

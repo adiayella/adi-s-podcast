@@ -8,7 +8,7 @@ const { guests, guestAliases, guestAppearances, brands, brandAliases, sponsorEvi
 
 const STRENGTH: Record<string, number> = { explicit_sponsor: 4, paid_promotion: 3, possible_affiliate: 2, unknown: 1, organic_mention: 0 };
 
-type JobRow = { episodeId: number; extraction: Extraction; paidFlag: boolean };
+type JobRow = { episodeId: number; extraction: Extraction; paidFlag: boolean; timestamps: { guests?: Record<string, number>; sponsors?: Record<string, number> } | null };
 
 async function rows<T>(q: ReturnType<typeof sql>): Promise<T[]> {
   const res = (await db.execute(q)) as unknown as { rows?: T[] } | T[];
@@ -29,7 +29,7 @@ export type ResolveSummary = {
 /** Turn raw model extractions into guest / brand entities. Safe to re-run: appearances and evidence are rebuilt per episode. */
 export async function resolveAll(): Promise<ResolveSummary> {
   const jobs = await rows<JobRow>(sql`
-    select j.episode_id as "episodeId", j.raw_output->'extraction' as extraction,
+    select j.episode_id as "episodeId", j.raw_output->'extraction' as extraction, j.raw_output->'timestamps' as timestamps,
            coalesce((select bool_or(s.paid_promotion) from episode_sources s where s.episode_id = j.episode_id), false) as "paidFlag"
     from analysis_jobs j join episodes e on e.id = j.episode_id
     where j.status = 'done' and j.stage = 'analyze' and j.prompt_version = ${PROMPT_VERSION}
@@ -97,7 +97,9 @@ export async function resolveAll(): Promise<ResolveSummary> {
       }
       if (seenInEpisode.has(id)) continue;
       seenInEpisode.add(id);
-      apps.push({ episodeId: job.episodeId, guestId: id, confidence: g.confidence, source: "metadata", evidenceText: g.evidence || null });
+      // evidence found in a transcript carries the time it was said; everything else stays metadata-level
+      const at = job.timestamps?.guests?.[g.name];
+      apps.push({ episodeId: job.episodeId, guestId: id, confidence: g.confidence, source: at !== undefined ? "transcript" : "metadata", evidenceText: g.evidence || null, evidenceSeconds: at !== undefined ? Math.round(at) : null });
     }
 
     // ---- sponsors: one row per (episode, brand), strongest label wins ----
@@ -126,7 +128,8 @@ export async function resolveAll(): Promise<ResolveSummary> {
           seenBrandAlias.add(s.brand);
         }
       }
-      const row = { episodeId: job.episodeId, brandId: id, classification: s.classification, evidenceQuote: s.evidence, confidence: s.confidence, source: "metadata" as const, platformPaidFlag: job.paidFlag };
+      const at = job.timestamps?.sponsors?.[s.brand];
+      const row = { episodeId: job.episodeId, brandId: id, classification: s.classification, evidenceQuote: s.evidence, confidence: s.confidence, source: at !== undefined ? ("transcript" as const) : ("metadata" as const), platformPaidFlag: job.paidFlag, evidenceSeconds: at !== undefined ? Math.round(at) : null };
       const prev = best.get(id);
       if (!prev || STRENGTH[row.classification] > STRENGTH[prev.classification]) best.set(id, row);
     }

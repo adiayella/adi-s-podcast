@@ -37,6 +37,10 @@ export const podcasts = pgTable("podcasts", {
   rssUrl: text("rss_url").unique(),
   youtubeChannelId: text("youtube_channel_id"),
   enabled: boolean("enabled").notNull().default(true),
+  // Transcript policy. Published transcripts (RSS links) may be fetched unless switched off; audio is NEVER
+  // transcribed unless the founder records that we have the rights ('authorized').
+  allowPublicTranscripts: boolean("allow_public_transcripts").notNull().default(true),
+  audioTranscriptionRights: text("audio_transcription_rights").notNull().default("none"),
   lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
   lastSyncStatus: text("last_sync_status"), // 'ok' | 'error' | null
   lastSyncError: text("last_sync_error"),
@@ -55,6 +59,10 @@ export const episodes = pgTable(
     url: text("url"),
     // normalized title + podcast: used to merge the same episode seen via RSS and YouTube
     dedupeKey: text("dedupe_key").notNull(),
+    // 'metadata' = analysed from title and description only; 'transcript' = a transcript was available and used
+    coverage: text("coverage").notNull().default("metadata"),
+    durationSeconds: integer("duration_seconds"),
+    transcriptCheckedAt: timestamp("transcript_checked_at", { withTimezone: true }),
     embedding: vector("embedding", { dimensions: 768 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -79,6 +87,7 @@ export const episodeSources = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     // The platform's paid-product-placement flag. It says an ad exists, never who the advertiser is.
     paidPromotion: boolean("paid_promotion").notNull().default(false),
+    durationSeconds: integer("duration_seconds"),
   },
   (t) => [uniqueIndex("episode_sources_kind_ext_uq").on(t.kind, t.externalId)],
 );
@@ -114,6 +123,7 @@ export const guestAppearances = pgTable(
     confidence: real("confidence").notNull(),
     source: evidenceSource("source").notNull().default("metadata"),
     evidenceText: text("evidence_text"),
+    evidenceSeconds: integer("evidence_seconds"), // where in the audio the evidence was said, when a transcript has timestamps
   },
   (t) => [
     uniqueIndex("guest_appearances_uq").on(t.episodeId, t.guestId),
@@ -176,6 +186,7 @@ export const sponsorEvidence = pgTable(
     source: evidenceSource("source").notNull().default("metadata"),
     // The episode carried YouTube's paid-placement flag when this brand was found.
     platformPaidFlag: boolean("platform_paid_flag").notNull().default(false),
+    evidenceSeconds: integer("evidence_seconds"),
   },
   (t) => [
     uniqueIndex("sponsor_evidence_uq").on(t.episodeId, t.brandId),
@@ -356,4 +367,33 @@ export const apiUsage = pgTable(
     units: integer("units").notNull().default(0),
   },
   (t) => [uniqueIndex("api_usage_day_provider_uq").on(t.day, t.provider)],
+);
+
+// =====================================================================================
+// Transcript enrichment: where each episode's transcript came from, what it says, and when.
+// One row per (episode, source). Text is kept for re-analysis; the UI only ever shows short quotes.
+// =====================================================================================
+export const episodeTranscripts = pgTable(
+  "episode_transcripts",
+  {
+    id: serial("id").primaryKey(),
+    episodeId: integer("episode_id").notNull().references(() => episodes.id, { onDelete: "cascade" }),
+    // 'rss_tag' | 'public_page' | 'licensed_provider' | 'audio_transcription' | 'youtube_owner_caption'
+    source: text("source").notNull(),
+    sourceUrl: text("source_url"),
+    format: text("format"), // MIME type as published: application/json, text/vtt, application/x-subrip, text/plain, text/html
+    language: text("language"),
+    rightsBasis: text("rights_basis").notNull(), // why we are allowed to hold it, e.g. "published by the creator in the RSS feed"
+    // 'available' (link known, not fetched) | 'fetched' | 'failed' | 'not_permitted'
+    status: text("status").notNull().default("available"),
+    attempts: integer("attempts").notNull().default(0),
+    plainText: text("plain_text"),
+    segments: jsonb("segments"), // [{ start, end, speaker, text }] with start/end in seconds when the format has them
+    wordCount: integer("word_count"),
+    contentHash: text("content_hash"),
+    error: text("error"),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("episode_transcripts_uq").on(t.episodeId, t.source), index("episode_transcripts_status_idx").on(t.status)],
 );

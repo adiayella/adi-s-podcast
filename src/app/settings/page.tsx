@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Check, Database, Mail, Sparkles, Video, X, Rss } from "lucide-react";
 import { Badge, Panel, PanelSkeleton, PageHeader } from "@/components/ui";
 import { formatDateTimeIST, timeAgo } from "@/lib/format";
+import { getCoverage, getTranscriptStatus } from "@/lib/queries";
 import { getRecipient } from "@/services/brief";
 import { recentRuns } from "@/services/jobs";
 
@@ -47,6 +48,38 @@ function maskEmail(e: string | null) {
   if (!e) return "not set";
   const [u, d] = e.split("@");
   return `${u.slice(0, 2)}***@${d}`;
+}
+
+async function TranscriptPipeline() {
+  await connection();
+  const [status, coverage] = await Promise.all([getTranscriptStatus(), getCoverage()]);
+  const n = (src: string, st: string) => status.find((x) => x.source === src && x.status === st)?.n ?? 0;
+  const sources: { name: string; state: "active" | "gated" | "off"; detail: string }[] = [
+    { name: "Creator-published transcripts (RSS)", state: "active", detail: `${n("rss_tag", "fetched")} fetched, ${n("rss_tag", "available")} waiting, ${n("rss_tag", "failed")} failed, ${n("rss_tag", "not_permitted")} not permitted. Used whenever a feed publishes a transcript link.` },
+    { name: "Transcript pages linked in descriptions", state: "off", detail: "Not built. Some shows link a public transcript page; reading them would need an approved list of sites." },
+    { name: "Licensed transcript provider", state: "off", detail: "Not configured. Needs an account and a read of the provider's licence before it can be switched on." },
+    { name: "Audio transcription", state: "gated", detail: "Not built. Even when built it only runs for shows where you record that we have the rights, and outside Vercel." },
+    { name: "YouTube captions", state: "off", detail: "Not used. The YouTube API only releases captions to a video's owner; this app uses YouTube for metadata, view counts and the paid-placement flag only." },
+  ];
+  const tone = { active: "good", gated: "warn", off: "neutral" } as const;
+  return (
+    <Panel title="Transcript enrichment">
+      <p className="mb-4 text-[15px] text-muted">
+        <b className="text-ink">{coverage.transcript} of {coverage.total}</b> monitored episodes are analysed from a transcript ({coverage.shows} show{coverage.shows === 1 ? "" : "s"}). All others fall back to titles and descriptions, so every episode is still analysed.
+      </p>
+      <ul className="divide-y divide-line">
+        {sources.map((x) => (
+          <li key={x.name} className="flex items-start justify-between gap-4 py-3">
+            <div>
+              <p className="font-medium">{x.name}</p>
+              <p className="text-sm text-muted">{x.detail}</p>
+            </div>
+            <Badge tone={tone[x.state]}>{x.state === "active" ? "Active" : x.state === "gated" ? "Rights required" : "Off"}</Badge>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
 }
 
 type Run = Awaited<ReturnType<typeof recentRuns>>[number];
@@ -114,6 +147,9 @@ export default function SettingsPage() {
       <div className="grid gap-5">
         <Suspense fallback={<PanelSkeleton className="h-96" />}>
           <Sources />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton className="h-64" />}>
+          <TranscriptPipeline />
         </Suspense>
         <Suspense fallback={<PanelSkeleton className="h-72" />}>
           <Delivery />

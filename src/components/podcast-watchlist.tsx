@@ -52,6 +52,7 @@ function PodcastTable({ rows, admin }: { rows: PodcastRow[]; admin: boolean }) {
               <th className="py-2.5 pr-3 font-normal">Monitoring</th>
               <th className="py-2.5 pr-3 font-normal">Podcast</th>
               <th className="py-2.5 pr-3 font-normal">Episodes</th>
+              <th className="py-2.5 pr-3 font-normal">Transcripts</th>
               <th className="py-2.5 pr-3 font-normal">Latest episode</th>
               <th className="py-2.5 pr-3 font-normal">Last sync</th>
               {admin && <th className="py-2.5 text-right font-normal">Actions</th>}
@@ -88,6 +89,10 @@ function PodcastTable({ rows, admin }: { rows: PodcastRow[]; admin: boolean }) {
                   {p.lastSyncError && <p className="mt-1 max-w-[320px] text-xs text-bad">{p.lastSyncError}</p>}
                 </td>
                 <td className="py-3 pr-3 tabular-nums">{p.episodes}</td>
+                <td className="py-3 pr-3">
+                  {p.transcriptEpisodes > 0 ? <Badge tone="good">{p.transcriptEpisodes} of {p.episodes}</Badge> : <Badge>Metadata only</Badge>}
+                  {!p.allowPublicTranscripts && <p className="mt-1 text-xs text-muted">Transcripts off</p>}
+                </td>
                 <td className="py-3 pr-3 text-muted">{p.latestEpisode ? formatDateIST(p.latestEpisode) : "—"}</td>
                 <td className="py-3 pr-3">
                   <SyncBadge p={p} />
@@ -111,6 +116,14 @@ function PodcastTable({ rows, admin }: { rows: PodcastRow[]; admin: boolean }) {
                         <label className="grid gap-1 text-xs text-muted">Name<input name="name" defaultValue={p.name} required className={inputCls} /></label>
                         <label className="grid gap-1 text-xs text-muted">RSS feed URL<input name="rssUrl" type="url" defaultValue={p.rssUrl ?? ""} className={inputCls} /></label>
                         <label className="grid gap-1 text-xs text-muted">YouTube channel ID<input name="youtubeChannelId" defaultValue={p.youtubeChannelId ?? ""} className={inputCls} /></label>
+                        <label className="flex items-center gap-2 text-xs text-muted"><input type="checkbox" name="allowPublicTranscripts" defaultChecked={p.allowPublicTranscripts} className="size-4 accent-[#5b6cf0]" /> Use transcripts this show publishes</label>
+                        <label className="grid gap-1 text-xs text-muted">Permission to process this show&apos;s audio
+                          <select name="audioTranscriptionRights" defaultValue={p.audioTranscriptionRights} className={inputCls}>
+                            <option value="none">None (default)</option>
+                            <option value="authorized">I have the rights</option>
+                          </select>
+                        </label>
+                        <p className="text-xs text-muted">This only records permission. No audio is processed by the app yet.</p>
                         <button type="submit" className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/85">Save changes</button>
                       </form>
                     </details>

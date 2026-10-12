@@ -3,6 +3,7 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { db, schema } from "@/db";
 import { extractEpisode } from "@/nlp/extract";
 import { mergeDescriptions } from "@/nlp/text";
+import type { Segment } from "@/transcripts/parse";
 import { selectTopics } from "@/nlp/topics";
 import { PROMPT_VERSION } from "@/nlp/taxonomy";
 
@@ -53,12 +54,22 @@ async function processJob(job: ClaimedJob): Promise<{ ok: boolean; error?: strin
     `);
     if (!ep) throw new Error("Episode no longer exists");
 
+    // Use a stored transcript when there is one; otherwise this is the metadata-only analysis, exactly as before.
+    const [tr] = await rows<{ segments: Segment[]; source: string }>(sql`
+      select t.segments, t.source from episode_transcripts t
+      join episodes e on e.id = t.episode_id join podcasts p on p.id = e.podcast_id
+      where t.episode_id = ${job.episodeId} and t.status = 'fetched' and t.segments is not null
+        -- the rights gate applies when a transcript is USED, not only when it is fetched: switching a show off stops its use
+        and (t.source not in ('rss_tag', 'public_page') or p.allow_public_transcripts)
+        and (t.source not in ('audio_transcription', 'youtube_owner_caption') or p.audio_transcription_rights = 'authorized')
+      order by (t.source = 'rss_tag') desc, t.fetched_at desc limit 1`);
+
     const result = await extractEpisode({
       podcast: ep.podcast,
       title: ep.title,
       description: mergeDescriptions(ep.description ?? "", ep.ytDescription),
       publishedAt: new Date(ep.publishedAt).toISOString().slice(0, 10),
-    });
+    }, tr?.segments ?? null);
 
     // Topics come from a controlled vocabulary, so they can be stored straight away.
     const kept = selectTopics(result.extraction.topics);
@@ -83,7 +94,7 @@ async function processJob(job: ClaimedJob): Promise<{ ok: boolean; error?: strin
                 episodeId: job.episodeId,
                 topicId: idByName.get(t.topic)!,
                 confidence: t.confidence,
-                source: "metadata" as const,
+                source: result.coverage,
               })),
             ),
           ]
@@ -99,6 +110,10 @@ async function processJob(job: ClaimedJob): Promise<{ ok: boolean; error?: strin
             extraction: result.extraction,
             rejected: result.rejected,
             usage: { in: result.inputTokens, out: result.outputTokens },
+            // how deep the analysis went, where it came from, and where in the audio the evidence was said
+            coverage: result.coverage,
+            transcriptSource: tr?.source ?? null,
+            timestamps: result.timestamps,
           },
         })
         .where(sql`${schema.analysisJobs.id} = ${job.id}`),

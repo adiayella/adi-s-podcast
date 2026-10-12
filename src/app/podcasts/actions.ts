@@ -6,23 +6,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { requireAdmin, isAdmin } from "@/lib/admin";
+import { isPublicHttpUrl } from "@/lib/url-safety";
 import { ingestPodcast } from "@/services/ingest";
+import { applyTranscriptPolicy } from "@/transcripts/apply-policy";
 
 const { podcasts } = schema;
-
-// The server fetches whatever feed URL is stored, so refuse non-web and internal addresses.
-function isPublicHttpUrl(v: string): boolean {
-  try {
-    const u = new URL(v);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
-    const h = u.hostname.toLowerCase();
-    if (h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return false;
-    if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1\]?$)/.test(h)) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 const emptyToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 
@@ -74,10 +62,20 @@ export async function updatePodcast(formData: FormData) {
   const parsed = parse(formData);
   if (!Number.isInteger(id) || !parsed.success) return;
   const { name, rssUrl, youtubeChannelId } = parsed.data;
+  const allowPublic = formData.get("allowPublicTranscripts") === "on";
+  const [prev] = await db.select({ allow: podcasts.allowPublicTranscripts }).from(podcasts).where(eq(podcasts.id, id));
   await db
     .update(podcasts)
-    .set({ name, rssUrl: rssUrl ?? null, youtubeChannelId: youtubeChannelId ?? null })
+    .set({
+      name,
+      rssUrl: rssUrl ?? null,
+      youtubeChannelId: youtubeChannelId ?? null,
+      allowPublicTranscripts: allowPublic,
+      audioTranscriptionRights: formData.get("audioTranscriptionRights") === "authorized" ? "authorized" : "none",
+    })
     .where(eq(podcasts.id, id));
+  // switching published transcripts on or off takes effect on coverage and analysis straight away
+  if (prev && prev.allow !== allowPublic) await applyTranscriptPolicy(id, allowPublic);
   revalidatePath("/", "layout");
   refresh();
 }

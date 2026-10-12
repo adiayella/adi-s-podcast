@@ -22,10 +22,10 @@ async function run(name: string, fn: () => Promise<[boolean, string?]>) {
 
 async function main() {
   // ---------------- database integrity
-  await run("DB: all 23 tables (monitored + research) and pgvector present", async () => {
+  await run("DB: all 24 tables (monitored + research + transcripts) and pgvector present", async () => {
     const t = await sql`select count(*)::int n from information_schema.tables where table_schema='public' and table_name not like '\\_\\_%'`;
     const v = await sql`select 1 from pg_extension where extname='vector'`;
-    return [Number(t[0].n) >= 23 && v.length === 1, `${t[0].n} tables`];
+    return [Number(t[0].n) >= 24 && v.length === 1, `${t[0].n} tables`];
   });
   await run("DB: no duplicate episodes (same show + title)", async () => {
     const r = await sql`select count(*)::int n from (select podcast_id, dedupe_key from episodes group by 1,2 having count(*)>1) d`;
@@ -71,6 +71,30 @@ async function main() {
     return [r.length === 1, r.length ? `latest status: ${r[0].email_status}` : "none"];
   });
 
+  await run("Transcripts: an episode is marked transcript-level only if a fetched transcript exists", async () => {
+    const r = await sql`select count(*)::int n from episodes e where (e.coverage = 'transcript') <> exists (select 1 from episode_transcripts t where t.episode_id = e.id and t.status = 'fetched')`;
+    return [Number(r[0].n) === 0, `${r[0].n} mismatches`];
+  });
+  await run("Transcripts: every fetched transcript has text, segments and a stated rights basis", async () => {
+    const r = await sql`select count(*)::int n from episode_transcripts where status = 'fetched' and (coalesce(plain_text, '') = '' or segments is null or coalesce(rights_basis, '') = '')`;
+    return [Number(r[0].n) === 0, `${r[0].n} incomplete`];
+  });
+  await run("Transcripts: nothing was fetched from a show with published transcripts switched off", async () => {
+    const r = await sql`select count(*)::int n from episode_transcripts t join episodes e on e.id = t.episode_id join podcasts p on p.id = e.podcast_id where t.status = 'fetched' and t.source in ('rss_tag', 'public_page') and not p.allow_public_transcripts`;
+    return [Number(r[0].n) === 0, `${r[0].n} violations`];
+  });
+  await run("Transcripts: no audio-derived text exists without a recorded permission", async () => {
+    const r = await sql`select count(*)::int n from episode_transcripts t join episodes e on e.id = t.episode_id join podcasts p on p.id = e.podcast_id where t.source in ('audio_transcription', 'youtube_owner_caption') and p.audio_transcription_rights <> 'authorized'`;
+    return [Number(r[0].n) === 0, `${r[0].n} violations`];
+  });
+  await run("Transcripts: timestamps exist only on transcript-sourced evidence", async () => {
+    const r = await sql`select (select count(*) from guest_appearances where evidence_seconds is not null and source <> 'transcript')::int + (select count(*) from sponsor_evidence where evidence_seconds is not null and source <> 'transcript')::int as n`;
+    return [Number(r[0].n) === 0, `${r[0].n} violations`];
+  });
+  await run("Dedupe: no monitored show has two episodes with the same full description within 3 days", async () => {
+    const r = await sql`select count(*)::int n from episodes a join episodes b on a.podcast_id = b.podcast_id and a.id < b.id and length(coalesce(a.description,'')) > 200 and a.description = b.description and abs(extract(epoch from (a.published_at - b.published_at))) < 3 * 86400`;
+    return [Number(r[0].n) === 0, `${r[0].n} duplicate pairs`];
+  });
   await run("Research: an active settings version exists", async () => {
     const r = await sql`select max(version)::int v, count(*)::int n from research_settings_versions`;
     return [Number(r[0].v) >= 1, `active v${r[0].v}, ${r[0].n} versions kept`];

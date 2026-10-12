@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { BarChart3, CalendarClock, Hash, Megaphone, Newspaper, PieChart, Radio, UserSearch, Clock } from "lucide-react";
+import { BarChart3, CalendarClock, FileText, Hash, Megaphone, Newspaper, PieChart, Radio, UserSearch, Clock } from "lucide-react";
 import { Badge, KpiCard, Panel, PanelSkeleton, PageHeader } from "@/components/ui";
 import { RangeTabs } from "@/components/range-tabs";
 import { ShareDonut, WeeklyEpisodesChart } from "@/components/charts";
 import { PublishingHeatmap } from "@/components/heatmap";
 import { formatDateIST, pctChange, timeAgo } from "@/lib/format";
 import {
+  getCoverage,
   getKpis,
   getLatestEpisodes,
   getPublishingHeatmap,
@@ -55,12 +56,13 @@ async function Header({ searchParams }: { searchParams: PageProps<"/">["searchPa
 async function Body({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection();
   const range = parseRange((await searchParams).range);
-  const [k, weekly, shows, heat, latest] = await Promise.all([
+  const [k, weekly, shows, heat, latest, coverage] = await Promise.all([
     getKpis(range),
     getWeeklySeries(12),
     getShowActivity(range),
     getPublishingHeatmap(),
     getLatestEpisodes(10),
+    getCoverage(),
   ]);
 
   const top = shows.filter((s) => s.episodes > 0);
@@ -96,7 +98,7 @@ async function Body({ searchParams }: { searchParams: PageProps<"/">["searchPara
         />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {[
           { href: "/guests", label: "Guests tracked", v: k.guests, icon: UserSearch },
           { href: "/topics", label: "Topics detected", v: k.topics, icon: Hash },
@@ -112,6 +114,19 @@ async function Body({ searchParams }: { searchParams: PageProps<"/">["searchPara
             <p className="mt-3 text-3xl font-semibold tabular-nums">{r.v}</p>
           </Link>
         ))}
+        <Link href="/settings" className="group rounded-2xl bg-panel p-5 ring-1 ring-line transition hover:ring-accent/50">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2.5 text-[15px] text-ink/90">
+              <FileText size={18} className="text-soft" /> Transcript coverage
+            </span>
+          </div>
+          <p className="mt-3 text-3xl font-semibold tabular-nums">
+            {coverage.total ? Math.round((coverage.transcript / coverage.total) * 100) : 0}%
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {coverage.transcript} of {coverage.total} episodes analysed from a transcript ({coverage.shows} show{coverage.shows === 1 ? "" : "s"}); the rest from titles and descriptions
+          </p>
+        </Link>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_340px]">

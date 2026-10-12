@@ -11,6 +11,7 @@ import { getActiveConfig } from "@/services/research-settings";
 import { resolveAll } from "@/services/resolve";
 import { saveSnapshots } from "@/services/snapshots";
 import { syncYoutube } from "@/services/youtube";
+import { fetchPendingTranscripts } from "@/transcripts/fetch";
 
 export { recentRuns } from "@/services/job-log";
 
@@ -54,6 +55,10 @@ export function runFocused(opts: { force?: boolean } = {}) {
     });
     d.youtubeMatched = matched;
     d.youtubeUnits = yt.spent;
+
+    // Transcript enrichment: download transcripts feeds publish (rights gate applied), which sends those episodes
+    // back for analysis at transcript level. Episodes without one simply stay metadata-only.
+    d.transcripts = await fetchPendingTranscripts({ limit: 25 });
 
     d.queued = await enqueueAnalysis();
     let processed = 0;

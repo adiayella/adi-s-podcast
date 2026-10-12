@@ -30,6 +30,8 @@ export function buildBriefDoc(stats: BriefStats, narrative: Narrative | null): B
   const intro: Block[] = [];
   if (narrative?.summary) intro.push({ kind: "p", text: narrative.summary });
   else if (!narrative) intro.push({ kind: "p", text: "AI commentary was unavailable this week. Everything below is computed directly from the data.", muted: true });
+  if (stats.coverage && stats.coverage.total > 0)
+    intro.push({ kind: "p", muted: true, text: `Analysis depth: ${stats.coverage.transcript} of ${stats.coverage.total} monitored episodes (${Math.round((stats.coverage.transcript / stats.coverage.total) * 100)}%) were analysed from a transcript; the rest from titles and descriptions only.` });
   if (stats.health.syncErrors > 0 || stats.health.episodesLast7Days === 0)
     intro.push({ kind: "p", muted: true, text: `Data note: ${plural(stats.health.episodesLast7Days, "new episode")} in the last 7 days${stats.health.syncErrors ? `, ${plural(stats.health.syncErrors, "feed")} failed to sync` : ""}. Treat counts with care.` });
 

@@ -4,6 +4,7 @@ import { BadgeCheck, Link2, Megaphone, ShieldAlert } from "lucide-react";
 import { Badge, EmptyState, KpiCard, PageHeader, PanelSkeleton } from "@/components/ui";
 import { EpisodeLinks, ScoreCell, Tabs, withParam } from "@/components/radar-ui";
 import { FilterForm } from "@/components/filter-form";
+import { EvidenceSource } from "@/components/evidence-source";
 import { formatDateIST } from "@/lib/format";
 import { getEnabledPodcasts, getSponsorRadar, parsePeriod, type SponsorRow } from "@/services/radars";
 
@@ -44,6 +45,7 @@ function Evidence({ s }: { s: SponsorRow }) {
               {e.flag && <Badge tone="warn">YouTube: paid placement</Badge>}
             </div>
             {e.quote && <p className="mt-1 text-xs text-muted italic">“{e.quote.slice(0, 200)}”</p>}
+            <div className="mt-1"><EvidenceSource src={e.src} seconds={e.seconds} /></div>
           </div>
         ),
       }))}

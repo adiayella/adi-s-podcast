@@ -148,6 +148,9 @@ export type PodcastRow = {
   lastSyncError: string | null;
   episodes: number;
   latestEpisode: string | null;
+  transcriptEpisodes: number; // episodes analysed from a transcript rather than title and description only
+  allowPublicTranscripts: boolean;
+  audioTranscriptionRights: string; // 'none' | 'authorized' (a recorded permission; no audio is processed by this app yet)
 };
 
 export async function getPodcastRows(): Promise<PodcastRow[]> {
@@ -155,11 +158,26 @@ export async function getPodcastRows(): Promise<PodcastRow[]> {
     select p.id, p.name, p.rss_url as "rssUrl", p.youtube_channel_id as "youtubeChannelId",
            p.enabled, p.last_sync_at as "lastSyncAt", p.last_sync_status as "lastSyncStatus",
            p.last_sync_error as "lastSyncError",
-           count(e.id)::int as episodes, max(e.published_at) as "latestEpisode"
+           count(e.id)::int as episodes, max(e.published_at) as "latestEpisode",
+           count(e.id) filter (where e.coverage = 'transcript')::int as "transcriptEpisodes",
+           p.allow_public_transcripts as "allowPublicTranscripts", p.audio_transcription_rights as "audioTranscriptionRights"
     from podcasts p left join episodes e on e.podcast_id = p.id
     group by p.id order by p.enabled desc, p.name
   `);
-  return res.map((r) => ({ ...r, episodes: Number(r.episodes) }));
+  return res.map((r) => ({ ...r, episodes: Number(r.episodes), transcriptEpisodes: Number(r.transcriptEpisodes) }));
+}
+
+/** How deep the analysis goes: episodes analysed from a transcript versus from title and description only. */
+export async function getCoverage(): Promise<{ total: number; transcript: number; shows: number }> {
+  const [r] = await rows<{ total: number; transcript: number; shows: number }>(sql`
+    select count(*)::int as total, count(*) filter (where e.coverage = 'transcript')::int as transcript,
+           count(distinct e.podcast_id) filter (where e.coverage = 'transcript')::int as shows
+    from episodes e join podcasts p on p.id = e.podcast_id and p.enabled`);
+  return { total: Number(r?.total ?? 0), transcript: Number(r?.transcript ?? 0), shows: Number(r?.shows ?? 0) };
+}
+
+export async function getTranscriptStatus() {
+  return rows<{ source: string; status: string; n: number }>(sql`select source, status, count(*)::int as n from episode_transcripts group by 1, 2 order by 1, 2`);
 }
 
 export type WeeklyReportRow = { id: number; weekStart: string; briefMarkdown: string; emailStatus: string; createdAt: string };

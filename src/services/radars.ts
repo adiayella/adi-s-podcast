@@ -59,7 +59,7 @@ export async function getEnabledPodcasts(): Promise<{ id: number; name: string }
 }
 
 // ---------------------------------------------------------------- guests
-export type EpisodeRef = { title: string; url: string | null; podcast: string; at: string; evidence?: string | null };
+export type EpisodeRef = { title: string; url: string | null; podcast: string; at: string; evidence?: string | null; seconds?: number | null; src?: string | null };
 
 export type GuestRow = {
   id: number;
@@ -93,6 +93,7 @@ export async function getGuestRadar(opts: { period: Period; podcastId?: number; 
   const res = await rows<Record<string, unknown>>(sql`
     with apps as (
       select ga.guest_id, e.id as episode_id, e.podcast_id, p.name as podcast, e.title, e.url, e.published_at, ga.confidence, ga.evidence_text,
+             ga.evidence_seconds, ga.source as evidence_src,
              lag(e.published_at) over (partition by ga.guest_id, e.podcast_id order by e.published_at) as prev
       from guest_appearances ga
       join episodes e on e.id = ga.episode_id
@@ -110,7 +111,7 @@ export async function getGuestRadar(opts: { period: Period; podcastId?: number; 
            max(k.published_at) as "lastAt",
            (select min(e2.published_at) from guest_appearances ga2 join episodes e2 on e2.id = ga2.episode_id where ga2.guest_id = g.id) as "firstSeen",
            avg(k.confidence)::float as confidence,
-           json_agg(json_build_object('eid', k.episode_id, 'title', k.title, 'url', k.url, 'podcast', k.podcast, 'at', k.published_at, 'evidence', k.evidence_text)
+           json_agg(json_build_object('eid', k.episode_id, 'title', k.title, 'url', k.url, 'podcast', k.podcast, 'at', k.published_at, 'evidence', k.evidence_text, 'seconds', k.evidence_seconds, 'src', k.evidence_src)
                     order by k.published_at desc) as episodes
     from kept k join guests g on g.id = k.guest_id
     where ${includeJournalists ? sql`true` : sql`coalesce(g.category, '') <> 'journalist'`}
@@ -263,7 +264,7 @@ export async function getTopicRadar(opts: { podcastId?: number; focus?: FocusCon
 }
 
 // ---------------------------------------------------------------- sponsors
-export type SponsorEvidenceRow = { podcast: string; title: string; url: string | null; at: string; class: string; quote: string | null; flag: boolean; confidence: number };
+export type SponsorEvidenceRow = { podcast: string; title: string; url: string | null; at: string; class: string; quote: string | null; flag: boolean; confidence: number; seconds?: number | null; src?: string | null };
 
 export type SponsorRow = {
   id: number;
@@ -304,7 +305,7 @@ export async function getSponsorRadar(opts: { period: Period; podcastId?: number
       (avg(se.confidence) filter (where ${CONF}))::float as "confConfirmed",
       avg(se.confidence)::float as "confAll",
       json_agg(json_build_object('eid', e.id, 'podcast', p.name, 'title', e.title, 'url', e.url, 'at', e.published_at,
-               'class', se.classification, 'quote', se.evidence_quote, 'flag', se.platform_paid_flag, 'confidence', se.confidence)
+               'class', se.classification, 'quote', se.evidence_quote, 'flag', se.platform_paid_flag, 'confidence', se.confidence, 'seconds', se.evidence_seconds, 'src', se.source)
                order by e.published_at desc) as evidence
     from sponsor_evidence se
     join brands b on b.id = se.brand_id

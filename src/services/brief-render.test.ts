@@ -63,6 +63,16 @@ describe("brief with two sections", () => {
   });
 });
 
+describe("analysis depth", () => {
+  it("states how many episodes were analysed from a transcript", () => {
+    const md = toMarkdown(buildBriefDoc({ ...base, coverage: { transcript: 18, total: 240, shows: 1 } }, null));
+    expect(md).toContain("18 of 240 monitored episodes (8%) were analysed from a transcript");
+  });
+  it("omits the line for briefs stored before coverage existed", () => {
+    expect(toMarkdown(buildBriefDoc(base, null))).not.toContain("Analysis depth");
+  });
+});
+
 describe("email safety", () => {
   it("escapes untrusted discovered show names and quotes in the HTML email", () => {
     const evil = discovery({ candidates: [{ name: "<script>alert(1)</script>", relevance: 50, trend: "active", reason: "x \"quoted\" & <b>bold</b>", language: null, rssKnown: false, episodes: [] }] });

@@ -4,6 +4,7 @@ import { Repeat2, Sparkles, UserSearch, Users } from "lucide-react";
 import { Badge, EmptyState, KpiCard, PageHeader, PanelSkeleton } from "@/components/ui";
 import { EpisodeLinks, Pct, ScoreCell, Tabs, withParam } from "@/components/radar-ui";
 import { FilterForm } from "@/components/filter-form";
+import { EvidenceSource } from "@/components/evidence-source";
 import { formatDateIST } from "@/lib/format";
 import { getEnabledPodcasts, getGuestRadar, getMonthsWithData, parsePeriod } from "@/services/radars";
 
@@ -120,7 +121,7 @@ async function Radar({ searchParams }: { searchParams: Search }) {
                   <td className="px-3 py-3.5">
                     <EpisodeLinks
                       summary={`${g.episodes.length} episode${g.episodes.length > 1 ? "s" : ""}`}
-                      items={g.episodes.map((e) => ({ ...e, extra: e.evidence ? <p className="mt-1 text-xs text-muted italic">“{e.evidence}”</p> : null }))}
+                      items={g.episodes.map((e) => ({ ...e, extra: (<div className="mt-1.5 grid gap-1">{e.evidence && <p className="text-xs text-muted italic">“{e.evidence}”</p>}<EvidenceSource src={e.src} seconds={e.seconds} /></div>) }))}
                     />
                   </td>
                 </tr>

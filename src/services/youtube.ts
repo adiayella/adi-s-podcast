@@ -1,6 +1,7 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { normalize } from "@/nlp/verify";
+import { durationsCompatible } from "@/services/episode-dedupe";
 
 const { episodes, episodeSources } = schema;
 const API = "https://www.googleapis.com/youtube/v3";
@@ -126,7 +127,7 @@ export type YoutubeSyncResult = {
   error?: string;
 };
 
-type EpisodeRow = { id: number; title: string; publishedAt: Date };
+type EpisodeRow = { id: number; title: string; publishedAt: Date; durationSeconds: number | null };
 
 /** Attach YouTube data to episodes we already have from RSS. Never creates episodes. */
 export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, sinceDays: number): Promise<YoutubeSyncResult> {
@@ -140,11 +141,15 @@ export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, 
       const lo = new Date(v.publishedAt.getTime() - 14 * 86_400_000);
       const hi = new Date(v.publishedAt.getTime() + 14 * 86_400_000);
       const candidates: EpisodeRow[] = await db
-        .select({ id: episodes.id, title: episodes.title, publishedAt: episodes.publishedAt })
+        .select({ id: episodes.id, title: episodes.title, publishedAt: episodes.publishedAt, durationSeconds: episodes.durationSeconds })
         .from(episodes)
         .where(and(eq(episodes.podcastId, podcast.id), gte(episodes.publishedAt, lo), lte(episodes.publishedAt, hi)));
       const days = (c: EpisodeRow) => Math.abs(c.publishedAt.getTime() - v.publishedAt.getTime()) / 86_400_000;
-      const scored = candidates.map((c) => ({ c, s: titleSimilarity(v.title, c.title), d: days(c) })).sort((a, b) => b.s - a.s);
+      // a video whose length is far from the episode's is a clip or a different recording, not the same episode
+      const scored = candidates
+        .filter((c) => durationsCompatible(c.durationSeconds, v.seconds))
+        .map((c) => ({ c, s: titleSimilarity(v.title, c.title), d: days(c) }))
+        .sort((a, b) => b.s - a.s);
       const best = scored[0];
       const near = candidates.filter((c) => days(c) <= 3).length;
       // Within 3 days: a decent title match, or a weak one if it is the only episode nearby.
@@ -165,6 +170,7 @@ export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, 
           description: v.description,
           publishedAt: v.publishedAt,
           paidPromotion: v.paid,
+          durationSeconds: v.seconds || null,
         })
         .onConflictDoUpdate({
           target: [episodeSources.kind, episodeSources.externalId],
