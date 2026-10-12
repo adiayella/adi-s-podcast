@@ -7,6 +7,7 @@ import { reportWeekStart } from "@/lib/weeks";
 import { checkDelivery, checkPendingDeliveries, generateBrief, sendBrief } from "@/services/brief";
 import { checkReadiness } from "@/services/readiness";
 import { buildAudienceThemes, runAudienceAnalysis } from "@/services/audience";
+import { scoreOpportunities } from "@/services/intelligence";
 import { buildClusters, embedMissingEpisodes } from "@/services/semantic";
 import { discoverCore } from "@/services/discovery";
 import { ingestAllEnabled } from "@/services/ingest";
@@ -85,6 +86,7 @@ export function runFocused(opts: { force?: boolean; budgetMs?: number } = {}) {
       }
     };
     await optional("semantic", async () => ({ ...(await embedMissingEpisodes()), ...(await buildClusters()) }));
+    await optional("opportunities", () => scoreOpportunities());
     await optional("audience", async () => ({ ...(await runAudienceAnalysis({ maxVideos: 4 })), ...(await buildAudienceThemes()) }));
 
     d.briefRetry = await retryBrief();

@@ -472,3 +472,31 @@ export const audienceThemes = pgTable("audience_themes", {
   interviewQuestions: jsonb("interview_questions").notNull(), // AI-SUGGESTED, labelled as such in the UI
   computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------- Phase 3: versioned rubrics and stored opportunity scores ----------
+// Editing a rubric never rewrites history: it adds a new version, and every stored score names the version that produced it.
+export const rubricVersions = pgTable("rubric_versions", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(), // guest | sponsor
+  weights: jsonb("weights").notNull(),
+  note: text("note"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const opportunityScores = pgTable(
+  "opportunity_scores",
+  {
+    id: serial("id").primaryKey(),
+    kind: text("kind").notNull(), // guest | sponsor
+    entityId: integer("entity_id").notNull(),
+    weekStart: date("week_start").notNull(),
+    score: numeric("score", { precision: 5, scale: 1 }).notNull(),
+    criteria: jsonb("criteria").notNull(), // the full breakdown: value, weight and a plain-language note per criterion
+    missing: jsonb("missing").notNull(), // criteria excluded for lack of data
+    confidence: jsonb("confidence").notNull(), // { level, score, reasons }
+    rubricVersionId: integer("rubric_version_id").notNull().references(() => rubricVersions.id),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("opportunity_scores_uq").on(t.kind, t.entityId, t.weekStart)],
+);

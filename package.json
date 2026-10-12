@@ -25,6 +25,8 @@
     "snapshot": "tsx scripts/snapshot.ts",
     "brief": "tsx scripts/brief.ts",
     "semantic": "tsx scripts/semantic.ts",
+    "phase3-e2e": "tsx scripts/phase3-e2e.ts",
+    "intelligence": "tsx scripts/intelligence.ts",
     "phase2-e2e": "tsx scripts/phase2-e2e.ts",
     "audience": "tsx scripts/audience.ts",
     "weekly-e2e": "tsx scripts/weekly-e2e.ts",
