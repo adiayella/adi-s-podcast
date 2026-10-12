@@ -1,10 +1,8 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { connection } from "next/server";
-import { Lock, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { EmptyState, PageHeader, Panel, PanelSkeleton } from "@/components/ui";
 import { OutreachCard, SenderForm, type CardTarget } from "@/components/outreach-card";
-import { isAdmin } from "@/lib/admin";
 import { getSender, listTargets } from "@/services/outreach";
 
 export default function OutreachPage() {
@@ -20,14 +18,6 @@ export default function OutreachPage() {
 
 async function Body() {
   await connection();
-  if (!(await isAdmin()))
-    return (
-      <EmptyState icon={Lock} title="Sign in to see outreach">
-        <p>
-          Contact routes and drafts are private. <Link href="/admin" className="underline">Sign in as admin</Link> to view and edit them.
-        </p>
-      </EmptyState>
-    );
   const [targets, sender] = await Promise.all([listTargets(), getSender()]);
   const cards: CardTarget[] = targets.map((t) => ({
     kind: t.kind,

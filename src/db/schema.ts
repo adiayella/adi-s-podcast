@@ -117,6 +117,10 @@ export const guests = pgTable("guests", {
   category: text("category"), // founder | executive | investor | creator | expert | journalist | other
   verified: boolean("verified").notNull().default(false),
   needsReview: boolean("needs_review").notNull().default(false),
+  // Optional portrait, only set when a public encyclopedia page matches BOTH the name and the stored company/role. Otherwise initials are shown.
+  photoUrl: text("photo_url"),
+  photoSource: text("photo_source"), // page the photo came from, shown as credit
+  photoCheckedAt: timestamp("photo_checked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
