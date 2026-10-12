@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { Radio, SearchX, Sparkles } from "lucide-react";
+import { Globe, Radio, SearchX, Sparkles } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Badge, EmptyState, PageHeader, Panel, PanelSkeleton } from "@/components/ui";
 import { formatDateIST } from "@/lib/format";
 import { searchAll } from "@/services/overview";
 import { smartSearch, spotifyLive } from "@/services/search";
+import { webSearch } from "@/services/web-search";
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -32,9 +33,12 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
   if (q.length < 2) return <PageHeader title="Search" subtitle="Type at least two characters in the search box." />;
   return (
     <div className="grid gap-5">
-      <PageHeader title={`Results for “${q}”`} subtitle="What the radar's episodes say about it, live results from Spotify, and direct matches on guests, companies, topics and shows." />
+      <PageHeader title={`Results for “${q}”`} subtitle="What the radar's episodes say about it, what the web is saying this month, live results from Spotify, and direct matches." />
       <Suspense fallback={<PanelSkeleton className="h-64" />}>
         <Answer q={q} />
+      </Suspense>
+      <Suspense fallback={<PanelSkeleton className="h-48" />}>
+        <WebResults q={q} />
       </Suspense>
       <Suspense fallback={<PanelSkeleton className="h-48" />}>
         <SpotifyResults q={q} />
@@ -75,6 +79,40 @@ async function Answer({ q }: { q: string }) {
         {r.method === "gemini"
           ? "Candidates come from word matches and closeness of meaning (embeddings); Gemini Flash keeps only the relevant ones and writes the summary from them alone."
           : `Showing word matches only${r.error ? ` (AI ranking unavailable: ${r.error})` : ""}.`}
+      </p>
+    </Panel>
+  );
+}
+
+async function WebResults({ q }: { q: string }) {
+  await connection();
+  const r = await webSearch(q);
+  if (!r.configured) return null;
+  return (
+    <Panel title="From the web" icon={Globe} right={<span className="text-sm text-muted">news from the last month first · via Tavily</span>}>
+      {r.summary && <p className="mb-4 text-[15px] leading-relaxed text-ink/90">{r.summary}</p>}
+      {r.matches.length ? (
+        <ul className="grid gap-3 text-[15px]">
+          {r.matches.map((m) => (
+            <li key={m.url} className="flex gap-3">
+              <span className="w-7 shrink-0 text-sm tabular-nums text-muted">[{m.n}]</span>
+              <span className="min-w-0">
+                <ExternalLink href={m.url}>{m.title}</ExternalLink>
+                <span className="text-sm text-muted">
+                  {" "}
+                  · {m.site}
+                  {m.published ? ` · ${m.published}` : ""}
+                </span>
+                {m.why ? <p className="mt-0.5 text-sm text-soft">{m.why}</p> : <p className="mt-0.5 line-clamp-2 text-sm text-muted">{m.snippet}</p>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted">{r.error ? `Web search failed: ${r.error}` : "No recent web coverage found."}</p>
+      )}
+      <p className="mt-4 text-xs text-muted">
+        Tavily finds the pages; Gemini Flash keeps the relevant ones and writes the summary from their snippets only, citing them as [n]. Web results are context: they never become radar guests, sponsors or scores. Check the sources before using a fact on air.
       </p>
     </Panel>
   );
