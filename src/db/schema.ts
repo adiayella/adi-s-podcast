@@ -92,6 +92,22 @@ export const episodeSources = pgTable(
   (t) => [uniqueIndex("episode_sources_kind_ext_uq").on(t.kind, t.externalId)],
 );
 
+// One row per YouTube video per day: the public view, like and comment counts as the API reported them that day.
+// Growth between two dates is a real difference of two observations, never an estimate. Shares are not exposed by the API.
+export const episodeMetricSnapshots = pgTable(
+  "episode_metric_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    episodeSourceId: integer("episode_source_id").notNull().references(() => episodeSources.id, { onDelete: "cascade" }),
+    capturedOn: date("captured_on").notNull(), // IST calendar date
+    views: integer("views"),
+    likes: integer("likes"), // null when the channel hides like counts
+    comments: integer("comments"), // null when comments are disabled
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("episode_metric_snapshots_uq").on(t.episodeSourceId, t.capturedOn)],
+);
+
 // ---------- guests ----------
 export const guests = pgTable("guests", {
   id: serial("id").primaryKey(),

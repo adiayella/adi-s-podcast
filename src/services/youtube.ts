@@ -4,6 +4,8 @@ import { normalize } from "@/nlp/verify";
 import { durationsCompatible } from "@/services/episode-dedupe";
 
 const { episodes, episodeSources } = schema;
+
+const istDate = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 const API = "https://www.googleapis.com/youtube/v3";
 const MIN_EPISODE_SECONDS = 15 * 60; // shorter videos are clips/shorts, not full episodes
 const STOPWORDS = new Set(["the", "a", "an", "of", "and", "to", "in", "on", "for", "with", "is", "are", "how", "why", "what", "ft", "feat", "ep", "episode", "trs"]);
@@ -124,6 +126,7 @@ export type YoutubeSyncResult = {
   matched: number;
   paidFlagged: number;
   unmatched: string[];
+  snapshots: number;
   error?: string;
 };
 
@@ -131,7 +134,7 @@ type EpisodeRow = { id: number; title: string; publishedAt: Date; durationSecond
 
 /** Attach YouTube data to episodes we already have from RSS. Never creates episodes. */
 export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, sinceDays: number): Promise<YoutubeSyncResult> {
-  const result: YoutubeSyncResult = { podcastId: podcast.id, name: podcast.name, longVideos: 0, matched: 0, paidFlagged: 0, unmatched: [] };
+  const result: YoutubeSyncResult = { podcastId: podcast.id, name: podcast.name, longVideos: 0, matched: 0, paidFlagged: 0, unmatched: [], snapshots: 0 };
   try {
     if (!podcast.youtubeChannelId) throw new Error("No YouTube channel configured");
     const videos = (await fetchRecentVideos(podcast.youtubeChannelId, sinceDays)).filter((v) => v.seconds >= MIN_EPISODE_SECONDS);
@@ -159,7 +162,7 @@ export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, 
         result.unmatched.push(v.title.slice(0, 70));
         continue;
       }
-      await db
+      const [source] = await db
         .insert(episodeSources)
         .values({
           episodeId: best.c.id,
@@ -175,7 +178,16 @@ export async function syncYoutube(podcast: typeof schema.podcasts.$inferSelect, 
         .onConflictDoUpdate({
           target: [episodeSources.kind, episodeSources.externalId],
           set: { title: v.title, description: v.description, paidPromotion: v.paid },
-        });
+        })
+        .returning({ id: episodeSources.id });
+      // The counts were already in this response, so recording them costs no extra quota. One row per video per day.
+      if (v.views !== null) {
+        await db
+          .insert(schema.episodeMetricSnapshots)
+          .values({ episodeSourceId: source.id, capturedOn: istDate(), views: v.views, likes: v.likes, comments: v.comments })
+          .onConflictDoUpdate({ target: [schema.episodeMetricSnapshots.episodeSourceId, schema.episodeMetricSnapshots.capturedOn], set: { views: v.views, likes: v.likes, comments: v.comments, capturedAt: new Date() } });
+        result.snapshots++;
+      }
       result.matched++;
       if (v.paid) result.paidFlagged++;
     }

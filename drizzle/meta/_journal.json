@@ -57,6 +57,13 @@
       "when": 1791814813748,
       "tag": "0007_vengeful_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791815047290,
+      "tag": "0008_magical_killmonger",
+      "breakpoints": true
     }
   ]
 }
