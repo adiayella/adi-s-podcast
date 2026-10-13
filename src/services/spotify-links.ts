@@ -4,7 +4,7 @@ import { matchEpisode } from "@/discovery/spotify-trend";
 import { cached } from "@/lib/api-budget";
 import { isDeadEpisodeLink, spotifySearchUrl } from "@/lib/episode-link";
 import { normalize } from "@/nlp/verify";
-import { findShow, showEpisodes, spotifyCalls, spotifyConfigured, type SpotifyShow } from "@/services/spotify";
+import { findShow, showEpisodes, SpotifyPaused, spotifyCalls, spotifyConfigured, type SpotifyShow } from "@/services/spotify";
 
 // Gives every episode a link that opens: the exact Spotify episode when it can be matched, else the YouTube
 // video, else a Spotify search for the exact title. Only episodes whose link is missing, dead (Spotify for
@@ -23,6 +23,7 @@ export type LinkRepairResult = {
   spotifyCalls: number;
   applied: boolean;
   samples: { ours: string; spotify: string }[]; // matched pairs, for a human spot check
+  paused?: string;
 };
 
 async function showFor(name: string): Promise<SpotifyShow | null> {
@@ -57,7 +58,10 @@ async function chooseLinks(rows: Row[], result: LinkRepairResult) {
         if (matched) result.showsMatched++;
         else result.showsNotFound.push(group[0].show);
       } catch (e) {
-        result.showsNotFound.push(`${group[0].show} (${e instanceof Error ? e.message : e})`);
+        // Paused by Spotify: no further calls are made this run (the client refuses them); fallbacks still apply,
+        // and these episodes are looked at again on a later run.
+        if (e instanceof SpotifyPaused) result.paused = e.message;
+        else result.showsNotFound.push(`${group[0].show} (${e instanceof Error ? e.message : e})`);
       }
     }
     for (const r of group) {

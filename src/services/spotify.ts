@@ -36,14 +36,39 @@ async function accessToken(): Promise<string> {
 
 export let spotifyCalls = 0;
 
+/** Thrown when Spotify asks us to wait longer than a run can (its quota limit answers 429 with hours to wait). */
+export class SpotifyPaused extends Error {
+  constructor(public family: string, public until: Date) {
+    super(`Spotify ${family} requests are paused by Spotify until ${until.toISOString().slice(0, 16)}Z (quota limit)`);
+  }
+}
+
+// Spotify limits each kind of request separately (search kept working while show lookups were blocked), so a pause
+// applies only to that kind. Once paused, no further calls of that kind are made: retrying would only extend the penalty.
+const pausedUntil = new Map<string, number>();
+const familyOf = (path: string) => path.split("/")[0];
+
+export function spotifyPausedUntil(family = "shows"): Date | null {
+  const t = pausedUntil.get(family);
+  return t && t > Date.now() ? new Date(t) : null;
+}
+
 async function sp<T>(path: string, params: Record<string, string>): Promise<T> {
+  const family = familyOf(path);
+  const paused = spotifyPausedUntil(family);
+  if (paused) throw new SpotifyPaused(family, paused);
   for (let attempt = 0; attempt < 3; attempt++) {
     await sleep(120); // stay well inside the rolling rate limit
     const res = await fetch(`${API}/${path}?${new URLSearchParams({ market: MARKET, ...params })}`, { headers: { Authorization: `Bearer ${await accessToken()}` } });
     spotifyCalls++;
     if (res.ok) return res.json() as Promise<T>;
+    const wait = Number(res.headers.get("retry-after") ?? "2");
+    if (res.status === 429 && wait > 60) {
+      pausedUntil.set(family, Date.now() + wait * 1000);
+      throw new SpotifyPaused(family, new Date(Date.now() + wait * 1000));
+    }
     if (res.status === 401) token = null;
-    else if (res.status === 429) await sleep(Math.min(Number(res.headers.get("retry-after") ?? "2"), 30) * 1000);
+    else if (res.status === 429) await sleep(wait * 1000);
     else if (res.status < 500) throw new Error(`Spotify ${path}: HTTP ${res.status}`);
     else await sleep(1000 * 2 ** attempt);
   }

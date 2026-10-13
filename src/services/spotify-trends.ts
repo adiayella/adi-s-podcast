@@ -5,7 +5,7 @@ import { SECTOR_SEARCH, SPOTIFY_TREND_RUBRIC, scoreShow, sectorHeat, type Sector
 const istDate = (d: Date) => new Date(d.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 import { normalize } from "@/nlp/verify";
 import { TOPICS, type Topic } from "@/nlp/taxonomy";
-import { searchShows, showEpisodes, spotifyCalls, spotifyConfigured, type SpotifyEpisode } from "@/services/spotify";
+import { searchShows, showEpisodes, SpotifyPaused, spotifyCalls, spotifyConfigured, type SpotifyEpisode } from "@/services/spotify";
 
 // Spotify trend scan: for every sector, the shows Spotify ranks for it in India, scored on the Spotify trend rubric.
 // Nothing here is sent to Gemini (Spotify Developer Terms IV.2.1.1). Rows older than 30 days are deleted (IV.3.1.1).
@@ -13,7 +13,7 @@ import { searchShows, showEpisodes, spotifyCalls, spotifyConfigured, type Spotif
 const { spotifySectorObservations: obs } = schema;
 const KEEP_DAYS = 30;
 
-export type SpotifyTrendRun = { configured: boolean; sectors: number; shows: number; skippedSectors: string[]; purged: number; spotifyCalls: number; errors: string[] };
+export type SpotifyTrendRun = { configured: boolean; sectors: number; shows: number; skippedSectors: string[]; purged: number; spotifyCalls: number; errors: string[]; paused?: string };
 
 export async function runSpotifyTrends(opts: { force?: boolean; budgetMs?: number; sectors?: Topic[]; now?: Date } = {}): Promise<SpotifyTrendRun> {
   const now = opts.now ?? new Date();
@@ -27,7 +27,9 @@ export async function runSpotifyTrends(opts: { force?: boolean; budgetMs?: numbe
   const purged = await db.delete(obs).where(lt(obs.observedOn, cutoff)).returning({ id: obs.id });
   out.purged = purged.length;
 
-  const done = opts.force ? new Set<string>() : new Set((await db.selectDistinct({ s: obs.sector }).from(obs).where(eq(obs.observedOn, today))).map((r) => r.s));
+  // Weekly: a sector scanned in the last 6 days is skipped. A daily scan (about 175 calls) ran into Spotify's quota limit.
+  const recent = istDate(new Date(now.getTime() - 6 * 86_400_000));
+  const done = opts.force ? new Set<string>() : new Set((await db.selectDistinct({ s: obs.sector }).from(obs).where(gte(obs.observedOn, recent))).map((r) => r.s));
   const episodeCache = new Map<string, SpotifyEpisode[]>();
   const since = new Date(now.getTime() - 95 * 86_400_000);
 
@@ -73,6 +75,11 @@ export async function runSpotifyTrends(opts: { force?: boolean; budgetMs?: numbe
       }
       out.sectors++;
     } catch (e) {
+      if (e instanceof SpotifyPaused) {
+        // Spotify asked us to wait for hours: stop here, keep the last good scan, try again on a later run.
+        out.paused = e.message;
+        break;
+      }
       out.errors.push(`${sector}: ${e instanceof Error ? e.message.slice(0, 120) : e}`);
     }
   }
@@ -143,9 +150,10 @@ const HEAT_ORDER = { "heating up": 0, steady: 1, cooling: 2, "too little data": 
 export async function getSpotifyTrends(): Promise<SpotifySectorTrend[]> {
   const [latest] = await db.select({ d: obs.observedOn }).from(obs).orderBy(desc(obs.observedOn)).limit(1);
   if (!latest) return [];
-  // The newest observation of each sector within the last 7 days, so a partly finished run still shows everything.
-  const weekAgo = istDate(new Date(Date.now() - 7 * 86_400_000));
-  const rows = await db.select().from(obs).where(gte(obs.observedOn, weekAgo)).orderBy(desc(obs.observedOn), obs.rank);
+  // The newest observation of each sector within the last 14 days: scans are weekly, and a scan Spotify paused
+  // must not empty the page. Older rows are purged at 30 days.
+  const since14 = istDate(new Date(Date.now() - 14 * 86_400_000));
+  const rows = await db.select().from(obs).where(gte(obs.observedOn, since14)).orderBy(desc(obs.observedOn), obs.rank);
   const yt = await youtubeByName();
   const bySector = new Map<string, typeof rows>();
   for (const r of rows) {
